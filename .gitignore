@@ -1,0 +1,13 @@
+.env
+.idea/
+
+#ignore __pycache__
+**/__pycache__
+*.pyc
+
+#ignore macOS files
+.DS_Store
+
+# ignore prod and stage envs
+media/
+staticfiles/
