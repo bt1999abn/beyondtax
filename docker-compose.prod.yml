@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./
+      dockerfile: Dockerfile.prod
+    command: gunicorn boilerPlate.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - /var/certbot/conf:/etc/letsencrypt/:ro
+    expose:
+      - 8000
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/www/static/:/var/www/static/
+      -  /etc/letsencrypt/:/etc/letsencrypt/:rw
+      - ./nginx/conf.d/:/etc/nginx/templates
+    environment:
+      - NGINX_HOST=${HOST}
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
