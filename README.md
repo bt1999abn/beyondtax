@@ -37,7 +37,7 @@ https://medium.com/@akshatgadodia/deploying-a-django-application-with-docker-ngi
 
 # To generate SSL using CertBot.
 
-certbot certonly --manual --preferred-challenges dns --email avi@beyondTax.com --domains live.beyondTax.com
+certbot certonly --manual --preferred-challenges dns --email omkar.thouta0231@gmail.com --domains stage-api.beyondtaxindia.com
 ```
 
 # Increasing the Volume of EC2 instance

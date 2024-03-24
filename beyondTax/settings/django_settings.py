@@ -9,7 +9,7 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = ["localhost", ".beyondTax.com", "3.109.69.12"]
+ALLOWED_HOSTS = ["localhost", ".beyondtaxindia.com"]
 
 PROJECT_APPS = [
     'accounts',
