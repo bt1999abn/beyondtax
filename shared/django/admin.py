@@ -9,7 +9,7 @@ from django.db.models.constants import LOOKUP_SEP
 from django.utils.safestring import mark_safe
 from django.utils.text import smart_split, unescape_string_literal
 
-from boilerPlate import settings
+from beyondTax import settings
 from shared.libs.hashing import AlphaId
 from shared import utils as shared_utils
 

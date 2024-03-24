@@ -1,4 +1,4 @@
-from boilerPlate import settings
+from beyondTax import settings
 from shared import utils as shared_utils
 
 

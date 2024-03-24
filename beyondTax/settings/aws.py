@@ -1,6 +1,6 @@
 import os
 
-from boilerPlate.settings.base import BASE_DIR, env
+from beyondTax.settings.base import BASE_DIR, env
 
 
 USE_S3 = env.bool('USE_S3', False)
@@ -26,8 +26,8 @@ if USE_S3:
     AWS_PRIVATE_MEDIA_LOCATION = env('AWS_PRIVATE_MEDIA_LOCATION')
 
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_MEDIA_FILES_LOCATION}/'
-    DEFAULT_FILE_STORAGE = 'boilerPlate.storage.backends.PublicMediaStorage'
-    PRIVATE_FILE_STORAGE = 'boilerPlate.storage.backends.PrivateMediaStorage'
+    DEFAULT_FILE_STORAGE = 'beyondTax.storage.backends.PublicMediaStorage'
+    PRIVATE_FILE_STORAGE = 'beyondTax.storage.backends.PrivateMediaStorage'
 
     # DB BACKUP
     DBBACKUP_STORAGE = STATICFILES_STORAGE

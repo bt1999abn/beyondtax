@@ -37,7 +37,7 @@ https://medium.com/@akshatgadodia/deploying-a-django-application-with-docker-ngi
 
 # To generate SSL using CertBot.
 
-certbot certonly --manual --preferred-challenges dns --email avi@boilerPlate.com --domains live.boilerPlate.com
+certbot certonly --manual --preferred-challenges dns --email avi@beyondTax.com --domains live.beyondTax.com
 ```
 
 # Increasing the Volume of EC2 instance

@@ -1,4 +1,4 @@
-from boilerPlate.settings.base import env
+from beyondTax.settings.base import env
 
 
 FRONTEND_HOST = env("FRONTEND_HOST")

@@ -1,5 +1,5 @@
 # Guest Message Templates
-from boilerPlate import settings
+from beyondTax import settings
 
 GUEST_PAYMENT_REQUEST_TEMPLATE = "guest_payment_reques"
 GUEST_ORDER_CONFIRMED_TEMPLATE = "guest_order_confirmed"

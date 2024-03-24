@@ -1,6 +1,6 @@
 import os
 
-from boilerPlate.settings.base import BASE_DIR, env
+from beyondTax.settings.base import BASE_DIR, env
 from . import base as base_settings
 
 
@@ -9,7 +9,7 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = ["localhost", ".boilerPlate.com", "3.109.69.12"]
+ALLOWED_HOSTS = ["localhost", ".beyondTax.com", "3.109.69.12"]
 
 PROJECT_APPS = [
     'accounts',
@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'rangefilter',
 
 ] + PROJECT_APPS + [    # Config
-    'boilerPlate.apps.BoilerPlateConfig',
+    'beyondTax.apps.BoilerPlateConfig',
 ]
 
 MIDDLEWARE = [
@@ -51,7 +51,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'boilerPlate.urls'
+ROOT_URLCONF = 'beyondTax.urls'
 
 TEMPLATES = [
     {
@@ -71,7 +71,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'boilerPlate.wsgi.application'
+WSGI_APPLICATION = 'beyondTax.wsgi.application'
 AUTH_USER_MODEL = 'accounts.User'
 
 
@@ -131,7 +131,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-CSRF_TRUSTED_ORIGINS = ['https://*.boilerPlate.com']
+CSRF_TRUSTED_ORIGINS = ['https://*.beyondTax.com']
 
 INJECTION_MAPPINGS = PROJECT_APPS + ["shared"]
 

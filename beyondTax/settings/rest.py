@@ -1,4 +1,4 @@
-from boilerPlate.settings import base as base_settings
+from beyondTax.settings import base as base_settings
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ('knox.auth.TokenAuthentication',),
@@ -24,11 +24,11 @@ CORS_ORIGIN_WHITELIST = (
     'http://localhost:3001',
     'http://localhost:3002',
     'http://localhost:3003',
-    'https://boilerPlate.com',
+    'https://beyondTax.com',
     'https://coziqexperiences.com'
 )
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://\w+\.boilerPlate\.com$",
+    r"^https://\w+\.beyondTax\.com$",
     r"^https://\w+\.coziqexperiences\.com$",
 ]
 
