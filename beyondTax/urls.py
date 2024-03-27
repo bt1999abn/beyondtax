@@ -17,6 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+
+from . import views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('service-dummy-api/',views.ServiceDummyApiView.as_view(),name='service-dummy-api'),
+    path('mobilenumber-dummy-api/',views.MobileNumberDummyApi.as_view(),name='mobilenumber-dummy-api'),
+    path('verifyotp-dummy-api/', views.VerifyOtpDummyApi.as_view(),name ='verifyotp-dummy-api'),
 ]
