@@ -1,7 +1,7 @@
 # from django import forms
 # from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 # # For automatically registering all the apps
-# from django.contrib import admin
+from django.contrib import admin
 # from accounts import models as accounts_models
 #
 #

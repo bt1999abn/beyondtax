@@ -5,9 +5,10 @@ from django.core.validators import RegexValidator
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from accounts import constants as accounts_constants
+# from shared import abstract_models
+from django.utils import timezone
+from datetime import timedelta
 from shared import abstract_models
-
-
 class UserManager(BaseUserManager):
     def filter(self, is_superuser=False, is_staff=False, *args, **kwargs):
         return super(UserManager, self).filter(is_staff=is_staff, is_superuser=is_superuser, *args, **kwargs)
@@ -80,3 +81,25 @@ class User(abstract_models.BaseModel, AbstractUser):
         if self.date_of_birth and self.date_of_birth > datetime.date.today():
             raise ValidationError(accounts_constants.DOB_IN_FUTURE_ERROR)
         super(User, self).save(*args, **kwargs)
+# class User(AbstractUser):
+#     CHOICES=()
+#     mobilenumber_regex =RegexValidator(regex=r'^\+?1?\d{9,10}$', message ="mobile number must be entered in the format +919999999999.up to")
+#     otp_regex=RegexValidator(regex=r"^\d{4}$", message="please enter valid otp format ")
+#     mobilenumber=models.charField('mobile',validators=[mobilenumber_regex],max_length=10,unique=True,null=True)
+#     otp=models.charField('otp', validators=[otp_regex], max_length=4,unique=True,null=True)
+#     REQUIRED_FIELD=[mobilenumber]
+#     Required_field=[otp]
+
+
+        # def __str__(self):
+            # return self.mobile_number
+
+
+class OtpRecord(models.Model):
+    mobile_number = models.CharField(max_length=15)
+    otp = models.CharField(max_length=4)
+    otp_authenticator = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=timezone.now() + timedelta(minutes=2))
+    def __str__(self):
+        return self.mobile_number
