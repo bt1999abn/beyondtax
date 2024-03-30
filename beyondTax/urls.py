@@ -20,10 +20,14 @@ from django.urls import path, include
 from . import views
 
 urlpatterns = (
-    path('jet/', include('jet.urls', 'jet')),
     path('admin/', admin.site.urls),
     path('service-dummy-api/', views.ServiceDummyApiView.as_view(), name='service-dummy-api'),
     path('mobilenumber-dummy-api/', views.MobileNumberDummyApi.as_view(), name='mobilenumber-dummy-api'),
     path('verifyotp-dummy-api/', views.VerifyOtpDummyApi.as_view(), name='verifyotp-dummy-api'),
+
+    # Django JET dashboard URLS
+    path(r'jet/', include('shared.libs.external.jet.urls', 'jet')),  # Django JET URLS
+    path(r'jet/dashboard/', include('shared.libs.external.jet.dashboard.urls', 'jet-dashboard')),
+    # Django JET dashboard URLS
     path('accounts/', include('accounts.urls')),
 )

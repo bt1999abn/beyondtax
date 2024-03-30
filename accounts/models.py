@@ -1,25 +1,18 @@
 import datetime
 
 from django.conf import settings
-from accounts.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.contrib.auth.models import AbstractUser, BaseUserManager, User
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from accounts import constants as accounts_constants
-
-from django.utils import timezone
-from datetime import timedelta
+from shared import abstract_models
 
 
 class UserManager(BaseUserManager):
-    def filter(self, is_superuser=False, is_staff=False, *args, **kwargs):
-        return super(UserManager, self).filter(is_staff=is_staff, is_superuser=is_superuser, *args, **kwargs)
-
     def create_user(self, mobile_number, password, is_active=True, **extra_fields):
         if not mobile_number:
             raise ValueError("Mobile number is required")
-        mobile_number = self.normalize_mobile_number(mobile_number)
         user = self.model(mobile_number=mobile_number, **extra_fields)
         user.is_active = is_active
         user.set_password(password)
@@ -39,7 +32,7 @@ class UserManager(BaseUserManager):
         return self.create_user(mobile_number, password, **extra_fields)
 
 
-class User(User.BaseModel, AbstractUser):
+class User(abstract_models.BaseModel, AbstractUser):
     MALE, FEMALE, OTHER = 1, 2, 3
     GENDER_CHOICES = (
         (MALE, "Male"),
@@ -48,16 +41,17 @@ class User(User.BaseModel, AbstractUser):
     )
     username = None
     # TODO: Should we write Transgender in this or not.
-    mobile_number = models.CharField(max_length=15, unique=True)
     password = models.CharField(max_length=128, blank=True)
 
     # General Information
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    mobile_regex = RegexValidator(regex=r'^([1-9][0-9]{9})$', message=accounts_constants.PHONE_NUMBER_LIMIT_MESSAGE)
+    mobile_regex = RegexValidator(
+        regex=r'^([1-9][0-9]{9})$', message=accounts_constants.PHONE_NUMBER_LIMIT_MESSAGE
+    )
     # Validators should be a list
-    mobile_number = models.CharField(validators=[mobile_regex], max_length=10, blank=True)
+    mobile_number = models.CharField(validators=[mobile_regex], unique=True, max_length=10, blank=True)
     gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
 
     USERNAME_FIELD = 'mobile_number'
@@ -86,15 +80,11 @@ class User(User.BaseModel, AbstractUser):
         super(User, self).save(*args, **kwargs)
 
 
-
-
-class OtpRecord(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+class OtpRecord(abstract_models.BaseModel):
     mobile_number = models.CharField(max_length=15)
     otp = models.CharField(max_length=4)
-    otp_authenticator = models.CharField(max_length=255)
+    otp_session_id = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(default=timezone.now() + timedelta(minutes=2))
 
     def __str__(self):
         return self.mobile_number

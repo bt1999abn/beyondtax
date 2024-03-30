@@ -18,7 +18,7 @@ PROJECT_APPS = [
 
 # Application definition
 INSTALLED_APPS = [
-    'jet',
+    'shared.libs.external.jet.apps.JetAppConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
