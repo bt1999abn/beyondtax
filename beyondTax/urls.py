@@ -20,6 +20,7 @@ from django.urls import path, include
 from . import views
 
 urlpatterns = (
+    path('jet/', include('jet.urls', 'jet')),
     path('admin/', admin.site.urls),
     path('service-dummy-api/', views.ServiceDummyApiView.as_view(), name='service-dummy-api'),
     path('mobilenumber-dummy-api/', views.MobileNumberDummyApi.as_view(), name='mobilenumber-dummy-api'),

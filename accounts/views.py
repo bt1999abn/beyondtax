@@ -1,6 +1,8 @@
 import os
 
 import http.client
+
+from knox.models import AuthToken
 from rest_framework.views import APIView
 from .services import SendMobileOtpService
 from rest_framework.response import Response
@@ -36,9 +38,16 @@ class verifyOtpApi(APIView):
                 return Response({"error": "OTP has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
             if otp_record.otp == otp_provided:
-                return Response({"message": "OTP verified successfully"})
-            else:
-                return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
+                if otp_record.otp == otp_provided:
+
+                    user = otp_record.user
+
+                    _, token = AuthToken.objects.create(user)
+
+                    # Return the token in the response
+                    return Response({"message": "OTP verified successfully", "token": token})
+                else:
+                    return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
         except OtpRecord.DoesNotExist:
             return Response({"error": "OTP not found for the provided mobile number."},

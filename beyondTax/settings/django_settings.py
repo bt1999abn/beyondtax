@@ -18,7 +18,7 @@ PROJECT_APPS = [
 
 # Application definition
 INSTALLED_APPS = [
-    'shared.libs.external.jet.apps.JetAppConfig',
+    'jet',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,6 +39,11 @@ INSTALLED_APPS = [
 ] + PROJECT_APPS + [    # Config
     'beyondTax.apps.BoilerPlateConfig',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ('knox.auth.TokenAuthentication','rest_framework.authentication'
+                                                                       '.SessionAuthentication'),
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -99,6 +104,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
 
 
 # Internationalization

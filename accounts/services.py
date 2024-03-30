@@ -1,5 +1,5 @@
 import random
-
+import re
 
 import requests
 from django.conf import settings
@@ -16,9 +16,8 @@ class SendMobileOtpService:
     def send_otp(self):
         TWOFACTOR_API_KEY = '93a26564-edd8-11ee-8cbb-0200cd936042'
         otp = str(format(random.randint(1000,9999),'04d'))
-        response = requests.get('https://api.2factor.in/API/V1/{api_key}/SMS/+91{mobile_number}/AUTOGEN2/BEYONDTAX'.format(
-        api_key=TWOFACTOR_API_KEY, mobile_number=self.mobile_number))
-        print(response)
+        url = f"https://2factor.in/API/V1/{TWOFACTOR_API_KEY}/SMS/{self.mobile_number}/AUTOGEN3/BEYONDTAX"
+        response = requests.post(url)
         if response.status_code == 200:
             data = response.json()
             otp_session_id = data.get('Details')
@@ -39,6 +38,5 @@ class SendMobileOtpService:
             return True, "OTP verified successfully"
         else:
             return False, "Invalid OTP or OTP expired"
-
 
 
