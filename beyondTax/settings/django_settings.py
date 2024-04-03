@@ -40,6 +40,11 @@ INSTALLED_APPS = [
     'beyondTax.apps.BoilerPlateConfig',
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ('knox.auth.TokenAuthentication','rest_framework.authentication'
+                                                                       '.SessionAuthentication'),
+}
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -101,6 +106,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
@@ -131,7 +137,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-CSRF_TRUSTED_ORIGINS = ['https://*.beyondTax.com']
+CSRF_TRUSTED_ORIGINS = ['https://*.beyondtaxindia.com']
 
 INJECTION_MAPPINGS = PROJECT_APPS + ["shared"]
 
