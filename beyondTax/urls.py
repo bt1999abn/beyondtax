@@ -17,11 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.conf.urls.static import static
 
 from . import views
 
-urlpatterns = [
+urlpatterns = (
     path('admin/', admin.site.urls),
     path('service-dummy-api/', views.ServiceDummyApiView.as_view(), name='service-dummy-api'),
     path('mobilenumber-dummy-api/', views.MobileNumberDummyApi.as_view(), name='mobilenumber-dummy-api'),
@@ -32,4 +31,5 @@ urlpatterns = [
     path(r'jet/dashboard/', include('shared.libs.external.jet.dashboard.urls', 'jet-dashboard')),
     # Django JET dashboard URLS
     path('accounts/', include('accounts.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('beyondTaxServices/', include('beyondTaxServices.urls')),
+) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

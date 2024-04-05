@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -88,3 +89,22 @@ class OtpRecord(abstract_models.BaseModel):
 
     def __str__(self):
         return self.mobile_number
+
+
+class ServicePages(abstract_models.BaseModel):
+    service_title = models.CharField(max_length=255 , default='Default Title')
+    service_description = models.TextField(default='Default description')
+    certificate_price = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
+
+    registration_title = models.CharField(max_length=255 , default='Default Title')
+    what_is = models.JSONField(default=dict)
+
+    step_by_step_title = models.CharField(max_length=255 , default='Default Title')
+    step_by_step_description = models.JSONField(default=dict)
+
+    faq_title= models.CharField(max_length=255 , default='Default Title')
+    faq_description = models.TextField(default='Default description')
+    faq = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at= models.DateTimeField(auto_now_add=True)
+    slug = models.SlugField(unique=True, blank=True)
