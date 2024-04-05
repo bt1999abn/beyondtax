@@ -13,6 +13,7 @@ ALLOWED_HOSTS = ["localhost", "stage-api.beyondtaxindia.com"]
 
 PROJECT_APPS = [
     'accounts',
+    'beyondTaxServices',
 
 ]
 
@@ -25,6 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
 
 
     # External packages
