@@ -7,12 +7,13 @@ from .models import OtpRecord
 
 class SendMobileOtpService:
     def __init__(self):
-        self.OTP_TEMPLATE_NAME = "beyondTax"
+        self.OTP_TEMPLATE_NAME = "BEYONDTAX"
         self.TWO_FACTOR_SEND_OTP_URL = "https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}/{otp_template}"
         self.TWO_FACTOR_VERIFY_OTP_URL = "https://api.2factor.in/API/V1/{api_key}/SMS/VERIFY/{session_id}/{otp}"
-        self.TWOFACTOR_API_KEY = '93a26564-edd8-11ee-8cbb-0200cd936042'
+        self.TWOFACTOR_API_KEY = 'f149496a-f377-11ee-8cbb-0200cd936042'
 
     def send_otp(self, phone_number):
+        print(phone_number)
         otp = str(format(random.randint(1000, 9999), '04d'))
         url = self.TWO_FACTOR_SEND_OTP_URL.format(
             api_key=self.TWOFACTOR_API_KEY, phone_number=phone_number, otp=otp, otp_template=self.OTP_TEMPLATE_NAME

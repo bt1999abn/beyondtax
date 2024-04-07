@@ -33,17 +33,58 @@ class UserManager(BaseUserManager):
 
 
 class User(abstract_models.BaseModel, AbstractUser):
+
     MALE, FEMALE, OTHER = 1, 2, 3
     GENDER_CHOICES = (
         (MALE, "Male"),
         (FEMALE, "Female"),
         (OTHER, "Other")
     )
+    STATES_CHOICES = [
+         ('AP', 'Andhra Pradesh'),
+         ('AR', 'Arunachal Pradesh'),
+         ('AS', 'Assam'),
+         ('BR', 'Bihar'),
+         ('CT', 'Chhattisgarh'),
+         ('GA', 'Goa'),
+         ('GJ', 'Gujarat'),
+         ('HR', 'Haryana'),
+         ('HP', 'Himachal Pradesh'),
+         ('JK', 'Jammu and Kashmir'),
+         ('JH', 'Jharkhand'),
+         ('KA', 'Karnataka'),
+         ('KL', 'Kerala'),
+         ('MP', 'Madhya Pradesh'),
+         ('MH', 'Maharashtra'),
+         ('MN', 'Manipur'),
+         ('ML', 'Meghalaya'),
+         ('MZ', 'Mizoram'),
+         ('NL', 'Nagaland'),
+         ('OR', 'Odisha'),
+         ('PB', 'Punjab'),
+         ('RJ', 'Rajasthan'),
+         ('SK', 'Sikkim'),
+         ('TN', 'Tamil Nadu'),
+         ('TG', 'Telangana'),
+         ('TR', 'Tripura'),
+         ('UP', 'Uttar Pradesh'),
+         ('UT', 'Uttarakhand'),
+         ('WB', 'West Bengal'),
+         ('AN', 'Andaman and Nicobar Islands'),
+         ('CH', 'Chandigarh'),
+         ('DN', 'Dadra and Nagar Haveli'),
+         ('DD', 'Daman and Diu'),
+         ('DL', 'Delhi'),
+         ('LD', 'Lakshadweep'),
+         ('PY', 'Puducherry'),
+     ]
+
     username = None
     # TODO: Should we write Transgender in this or not.
     password = models.CharField(max_length=128, blank=True)
 
     # General Information
+
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -53,9 +94,11 @@ class User(abstract_models.BaseModel, AbstractUser):
     # Validators should be a list
     mobile_number = models.CharField(validators=[mobile_regex], unique=True, max_length=10, blank=True)
     gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
+    state = models.CharField(choices=STATES_CHOICES, null=True, blank=True)
 
+    email = models.CharField( max_length=255, blank=True )
     USERNAME_FIELD = 'mobile_number'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'state']
 
     objects = UserManager()
 

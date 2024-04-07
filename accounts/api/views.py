@@ -1,5 +1,7 @@
-from django.contrib.auth import login
+from django.contrib.auth import login, get_user_model
+from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
@@ -7,6 +9,7 @@ from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
 
+from accounts.api.serializers import RegistrationSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord
 from accounts.services import SendMobileOtpService
@@ -31,29 +34,11 @@ class sendOtpApi(APIView):
 
 
 class LoginAPIView(knox_views.LoginView):
-    permission_classes = (AllowAny, )
+    permission_classes = (AllowAny,)
     serializer_class = LoginSerializer
 
-    def _verify_otp(self, request):
-        otp_session_id = request.data.get('otp_session_id')
-        otp_provided = request.data.get('otp')
-        otp_record = OtpRecord.objects.filter(otp_session_id=otp_session_id).first()
-        OTP_EXPIRY = 3  # minutes
-
-        if not otp_record:
-            raise serializers.ValidationError("Please send the OTP first.")
-
-        if timezone.now() > otp_record.created_at + timedelta(minutes=OTP_EXPIRY):
-            raise serializers.ValidationError("OTP has expired.")
-
-        if otp_record.otp != otp_provided:
-            raise serializers.ValidationError("Wrong OTP.")
-        return otp_record.mobile_number
-
-    def post(self, request, format=None):
-        phone_number = self._verify_otp(request)
-        data = {"mobile_number": phone_number}
-        serializer = self.serializer_class(data=data)
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
             login(request, user)
@@ -62,3 +47,44 @@ class LoginAPIView(knox_views.LoginView):
             return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(response.data, status=status.HTTP_200_OK)
+
+
+class RegistrationApiView(APIView):
+    permission_classes = (AllowAny,)
+    serializer_class = RegistrationSerializer
+
+  # def _verify_otp(self, request):
+  #       otp_session_id = request.data.get('otp_session_id')
+  #       otp_provided = request.data.get('otp')
+  #       otp_record = OtpRecord.objects.filter(otp_session_id=otp_session_id).first()
+  #       OTP_EXPIRY = 3  # minutes
+  #
+  #       if not otp_record:
+  #           raise serializers.ValidationError("Please send the OTP first.")
+  #
+  #       if timezone.now() > otp_record.created_at + timedelta(minutes=OTP_EXPIRY):
+  #           raise serializers.ValidationError("OTP has expired.")
+  #
+  #       if otp_record.otp != otp_provided:
+  #           raise serializers.ValidationError("Wrong OTP.")
+  #       return otp_record.mobile_number
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            print(user.mobile_number)
+            service = SendMobileOtpService()
+            success, result = service.send_otp(phone_number=user.mobile_number)
+            if success:
+                return Response({
+                    'user_id': user.id,
+                    'otp_session_id': result
+                }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
