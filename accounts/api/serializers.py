@@ -1,15 +1,7 @@
 from django.contrib.auth import get_user_model, authenticate
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers, request
 from django.contrib.auth.models import User  # Use get_user_model() if you have a custom user model
-from django.contrib.auth.hashers import make_password
-
-# Replace 'your_username' with the actual username
-# user = User.objects.get(username='mobile_number')  # Adjust as necessary for custom models
-#
-# Set the new password (this example uses 'new_password' as the password)
-# user.password = make_password('new_password')
-# user.save()
-
 from accounts.models import User
 
 
@@ -23,11 +15,13 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Mobile Number is required field.")
         password = attrs.get('password')
 
-        if not mobile_number or not password:
+        if not password:
             raise serializers.ValidationError("Please give both email and password.")
+        try:
+            User.objects.get(mobile_number=mobile_number)
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError("User does not exist.")
         user = authenticate(username=mobile_number, password=password)
-        # user = User.objects.filter(mobile_number=mobile_number , password=password ).first()
-        # print(mobile_number, password)
         if user:
             attrs['user'] = user
             return attrs
@@ -61,6 +55,8 @@ class RegistrationSerializer(serializers.Serializer):
         email = attrs.get('email')
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError("This email is already used.")
+        if User.objects.filter(mobile_number=mobile_number).exists():
+            raise serializers.ValidationError("This mobile number already exists.")
         name_parts = full_name.split(' ', 1)
         attrs['first_name'] = name_parts[0]
         attrs['last_name'] = name_parts[1] if len(name_parts) > 1 else ''
@@ -72,7 +68,8 @@ class RegistrationSerializer(serializers.Serializer):
                     last_name=validated_data['last_name'],
                     date_of_birth=validated_data['date_of_birth'],
                     state=validated_data['state'],
-                    email=validated_data.get('email_id', '')
+                    email=validated_data.get('email_id', ''),
+                    is_active=False
                     )
         user.save()
         return user

@@ -96,8 +96,8 @@ class User(abstract_models.BaseModel, AbstractUser):
     mobile_number = models.CharField(validators=[mobile_regex], unique=True, max_length=10, blank=True)
     gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
     state = models.CharField(choices=STATES_CHOICES, null=True, blank=True)
-
-    email = models.CharField( max_length=255, blank=True )
+    is_active = models.BooleanField(default=False)
+    email = models.CharField(max_length=255, blank=True)
     USERNAME_FIELD = 'mobile_number'
     REQUIRED_FIELDS = ['first_name', 'last_name', 'state']
 

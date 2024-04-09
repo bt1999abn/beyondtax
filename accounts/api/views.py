@@ -1,16 +1,11 @@
-from django.contrib.auth import login
-from rest_framework.permissions import AllowAny
 from django.contrib.auth import login, get_user_model
-from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
-
 from accounts.api.serializers import RegistrationSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord
@@ -55,22 +50,6 @@ class RegistrationApiView(APIView):
     permission_classes = (AllowAny,)
     serializer_class = RegistrationSerializer
 
-  # def _verify_otp(self, request):
-  #       otp_session_id = request.data.get('otp_session_id')
-  #       otp_provided = request.data.get('otp')
-  #       otp_record = OtpRecord.objects.filter(otp_session_id=otp_session_id).first()
-  #       OTP_EXPIRY = 3  # minutes
-  #
-  #       if not otp_record:
-  #           raise serializers.ValidationError("Please send the OTP first.")
-  #
-  #       if timezone.now() > otp_record.created_at + timedelta(minutes=OTP_EXPIRY):
-  #           raise serializers.ValidationError("OTP has expired.")
-  #
-  #       if otp_record.otp != otp_provided:
-  #           raise serializers.ValidationError("Wrong OTP.")
-  #       return otp_record.mobile_number
-
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
@@ -85,6 +64,35 @@ class RegistrationApiView(APIView):
                 }, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VerifyOtpApiView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        otp_session_id = request.data.get('otp_session_id')
+        otp_provided = request.data.get('otp')
+        otp_record = OtpRecord.objects.filter(otp_session_id=otp_session_id).first()
+        User = get_user_model()
+        OTP_EXPIRY = 3  # minutes
+
+        if not otp_record:
+            raise serializers.ValidationError("Please send the OTP first.")
+
+        if timezone.now() > otp_record.created_at + timedelta(minutes=OTP_EXPIRY):
+            raise serializers.ValidationError("OTP has expired.")
+
+        if otp_record.otp != otp_provided:
+            raise serializers.ValidationError("Wrong OTP.")
+        user = User.objects.get(mobile_number=otp_record.mobile_number)
+        if user:
+            user.is_active = True
+            user.save()
+            return Response({"message": "OTP verified and user registered successfully."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
 
 
 
