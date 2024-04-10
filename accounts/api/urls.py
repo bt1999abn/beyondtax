@@ -10,6 +10,6 @@ urlpatterns = [
     path('verify_otp/', accounts_api_views.VerifyOtpApiView.as_view(), name='verify_otp'),
     path('update-profile/', accounts_api_views.UpdateProfileApi.as_view(), name='update-profile'),
     path('logout/', LogoutView.as_view()),
-    path('logout-all/', LogoutAllView.as_view())
+    path('logout-all/', LogoutAllView.as_view()),
     path('verify_otp/', accounts_api_views.VerifyOtpApiView.as_view(), name='verify_otp'),
 ]
