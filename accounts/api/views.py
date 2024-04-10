@@ -1,4 +1,6 @@
 from django.contrib.auth import login, get_user_model
+from django.contrib.auth.models import User
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,6 +8,7 @@ from rest_framework import status, serializers
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
+from accounts.api.serializers import RegistrationSerializer , UserProfileSerializer
 from accounts.api.serializers import RegistrationSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord
@@ -91,6 +94,28 @@ class VerifyOtpApiView(APIView):
             return Response({"message": "OTP verified and user registered successfully."}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ProfileApiView(APIView):
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        serializer = RegistrationSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpdateProfileApi(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def patch(self, request, *args, **kwargs):
+        user = request.user
+        serializer = UserProfileSerializer(user, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Profile updated successfully."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 
