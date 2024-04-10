@@ -42,42 +42,42 @@ class User(abstract_models.BaseModel, AbstractUser):
         (OTHER, "Other")
     )
     STATES_CHOICES = [
-         ('AP', 'Andhra Pradesh'),
-         ('AR', 'Arunachal Pradesh'),
-         ('AS', 'Assam'),
-         ('BR', 'Bihar'),
-         ('CT', 'Chhattisgarh'),
-         ('GA', 'Goa'),
-         ('GJ', 'Gujarat'),
-         ('HR', 'Haryana'),
-         ('HP', 'Himachal Pradesh'),
-         ('JK', 'Jammu and Kashmir'),
-         ('JH', 'Jharkhand'),
-         ('KA', 'Karnataka'),
-         ('KL', 'Kerala'),
-         ('MP', 'Madhya Pradesh'),
-         ('MH', 'Maharashtra'),
-         ('MN', 'Manipur'),
-         ('ML', 'Meghalaya'),
-         ('MZ', 'Mizoram'),
-         ('NL', 'Nagaland'),
-         ('OR', 'Odisha'),
-         ('PB', 'Punjab'),
-         ('RJ', 'Rajasthan'),
-         ('SK', 'Sikkim'),
-         ('TN', 'Tamil Nadu'),
-         ('TG', 'Telangana'),
-         ('TR', 'Tripura'),
-         ('UP', 'Uttar Pradesh'),
-         ('UT', 'Uttarakhand'),
-         ('WB', 'West Bengal'),
-         ('AN', 'Andaman and Nicobar Islands'),
-         ('CH', 'Chandigarh'),
-         ('DN', 'Dadra and Nagar Haveli'),
-         ('DD', 'Daman and Diu'),
-         ('DL', 'Delhi'),
-         ('LD', 'Lakshadweep'),
-         ('PY', 'Puducherry'),
+         ('Andhra Pradesh', 'Andhra Pradesh'),
+         ('Arunachal Pradesh', 'Arunachal Pradesh'),
+         ('Assam', 'Assam'),
+         ('Bihar', 'Bihar'),
+         ('Chhattisgarh', 'Chhattisgarh'),
+         ('Goa', 'Goa'),
+         ('Gujarat', 'Gujarat'),
+         ('Haryana', 'Haryana'),
+         ('Himachal Pradesh', 'Himachal Pradesh'),
+         ('Jammu and Kashmir', 'Jammu and Kashmir'),
+         ('Jharkhand', 'Jharkhand'),
+         ('Karnataka', 'Karnataka'),
+         ('Kerala', 'Kerala'),
+         ('Madhya Pradesh', 'Madhya Pradesh'),
+         ('Maharashtra', 'Maharashtra'),
+         ('Manipur', 'Manipur'),
+         ('Meghalaya', 'Meghalaya'),
+         ('Mizoram', 'Mizoram'),
+         ('Nagaland', 'Nagaland'),
+         ('Odisha', 'Odisha'),
+         ('Punjab', 'Punjab'),
+         ('Rajasthan', 'Rajasthan'),
+         ('Sikkim', 'Sikkim'),
+         ('Tamil Nadu', 'Tamil Nadu'),
+         ('Telangana', 'Telangana'),
+         ('Tripura', 'Tripura'),
+         ('Uttar Pradesh', 'Uttar Pradesh'),
+         ('Uttarakhand', 'Uttarakhand'),
+         ('West Bengal', 'West Bengal'),
+         ('Andaman and Nicobar Islands', 'Andaman and Nicobar Islands'),
+         ('Chandigarh', 'Chandigarh'),
+         ('Dadra and Nagar Haveli', 'Dadra and Nagar Haveli'),
+         ('Daman and Diu', 'Daman and Diu'),
+         ('Delhi', 'Delhi'),
+         ('Lakshadweep', 'Lakshadweep'),
+         ('Puducherry', 'Puducherry'),
      ]
 
     username = None
@@ -151,3 +151,22 @@ class ServicePages(abstract_models.BaseModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at= models.DateTimeField(auto_now_add=True)
     slug = models.SlugField(unique=True, blank=True)
+    required_documents = models.JSONField(default=dict)
+
+
+class WorkOrder(abstract_models.BaseModel):
+    Available, Inprocess, Canceled = 1, 2, 3
+    STATUS_CHOICES = (
+        (Available, "Available"),
+        (Inprocess, "Inprocess"),
+        (Canceled, "Canceled")
+    )
+    service_name = models.CharField(max_length=255, blank=True)
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    status = models.CharField(choices=STATUS_CHOICES, null=True, blank=True)
+
+
+class WorkOrderFiles(abstract_models.BaseModel):
+
+    files = models.FileField(upload_to='work_order_files/')
+    service = models.ForeignKey(ServicePages, related_name='work_order_files', on_delete=models.CASCADE)

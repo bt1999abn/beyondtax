@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model, authenticate
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.validators import RegexValidator
 from rest_framework import serializers, request
 from django.contrib.auth.models import User  # Use get_user_model() if you have a custom user model
 from accounts.models import User
@@ -30,7 +31,11 @@ class LoginSerializer(serializers.Serializer):
 
 
 class RegistrationSerializer(serializers.Serializer):
-    mobile_number = serializers.CharField()
+    mobile_regex = RegexValidator(
+        regex=r'^[1-9][0-9]{9}$',
+        message="Please enter a valid mobile number format."
+    )
+    mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10)
     full_name = serializers.CharField()
     date_of_birth = serializers.DateField()
     state = serializers.ChoiceField(choices=User.STATES_CHOICES)
@@ -73,6 +78,31 @@ class RegistrationSerializer(serializers.Serializer):
                     )
         user.save()
         return user
+
+
+class UserProfileSerializer(serializers.Serializer):
+    mobile_regex = RegexValidator(
+        regex=r'^[1-9][0-9]{9}$',
+        message="Please enter a valid mobile number format."
+    )
+    mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10)
+    first_name = serializers.CharField(max_length=255, required=False)
+    last_name = serializers.CharField(max_length=255, required=False)
+    date_of_birth = serializers.DateField()
+    state = serializers.ChoiceField(choices=User.STATES_CHOICES)
+    email = serializers.CharField(required=False, allow_blank=True)
+
+    def update(self, instance, validated_data):
+        instance.mobile_number = validated_data.get('mobile_number', instance.mobile_number)
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        if 'date_of_birth' in validated_data:
+            instance.date_of_birth = validated_data['date_of_birth']
+        instance.state = validated_data.get('state', instance.state)
+        if 'email' in validated_data:
+            instance.email = validated_data['email']
+        instance.save()
+        return instance
 
 
 
