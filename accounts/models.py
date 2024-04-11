@@ -161,9 +161,11 @@ class WorkOrder(abstract_models.BaseModel):
         (Inprocess, "Inprocess"),
         (Canceled, "Canceled")
     )
-    service_name = models.CharField(max_length=255, blank=True)
-    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
-    status = models.CharField(choices=STATUS_CHOICES, null=True, blank=True)
+    service_name = models.CharField(max_length=255, blank=False)
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'),  blank=False)
+    status = models.CharField(choices=STATUS_CHOICES, null=True, blank=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_orders')
+    REQUIRED_FIELDS = ['service_name', 'amount_paid', 'status']
 
 
 class WorkOrderFiles(abstract_models.BaseModel):
