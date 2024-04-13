@@ -10,7 +10,7 @@ class SendMobileOtpService:
         self.OTP_TEMPLATE_NAME = "BEYONDTAX"
         self.TWO_FACTOR_SEND_OTP_URL = "https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}/{otp_template}"
         self.TWO_FACTOR_VERIFY_OTP_URL = "https://api.2factor.in/API/V1/{api_key}/SMS/VERIFY/{session_id}/{otp}"
-        self.TWOFACTOR_API_KEY = 'f149496a-f377-11ee-8cbb-0200cd936042'
+        self.TWOFACTOR_API_KEY = 'e64cf901-f976-11ee-8cbb-0200cd936042'
 
     def send_otp(self, phone_number):
         print(phone_number)

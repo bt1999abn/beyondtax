@@ -3,7 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
 from rest_framework import serializers, request
 from django.contrib.auth.models import User  # Use get_user_model() if you have a custom user model
-from accounts.models import User, WorkOrder
+from accounts.models import User, WorkOrder, WorkOrderFiles, ServicePages
 
 
 class LoginSerializer(serializers.Serializer):
@@ -112,6 +112,13 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         model = WorkOrder
         fields = '__all__'
         read_only_fields = ('user',)
+
+
+class WorkOrderFilesSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = WorkOrderFiles
+        fields=['work_order', 'file_name', 'files', 'service']
 
 
 
