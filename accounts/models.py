@@ -99,7 +99,7 @@ class User(abstract_models.BaseModel, AbstractUser):
     is_active = models.BooleanField(default=False)
     email = models.CharField(max_length=255, blank=True)
     USERNAME_FIELD = 'mobile_number'
-    REQUIRED_FIELDS = ['first_name', 'last_name', 'state']
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'state', 'password']
 
     objects = UserManager()
 
@@ -107,7 +107,9 @@ class User(abstract_models.BaseModel, AbstractUser):
         return self.email
 
     def get_full_name(self):
-        return f'{self.first_name} {self.last_name}'
+        first_name = " ".join(word.capitalize() for word in self.first_name.split()) if self.first_name else ''
+        last_name = " ".join(word.capitalize() for word in self.last_name.split()) if self.last_name else ''
+        return f'{first_name} {last_name}'.strip()
 
     def full_name(self):
         return self.get_full_name()
@@ -155,20 +157,20 @@ class ServicePages(abstract_models.BaseModel):
 
 
 class WorkOrder(abstract_models.BaseModel):
-    Available, Inprocess, Canceled = 1, 2, 3
+    Inprocess, Available, Canceled = 1, 2, 3
     STATUS_CHOICES = (
-        (Available, "Available"),
         (Inprocess, "Inprocess"),
+        (Available, "Available"),
         (Canceled, "Canceled")
     )
     service_name = models.CharField(max_length=255, blank=False)
-    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'),  blank=False)
-    status = models.CharField(choices=STATUS_CHOICES, null=True, blank=False)
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, null=True, default=Decimal('0.00'),  blank=False)
+    status = models.IntegerField(choices=STATUS_CHOICES, null=True, blank=False, default=1)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_orders')
+    service = models.ForeignKey(ServicePages, related_name='work_order_files', null=True, on_delete=models.CASCADE)
 
 
 class WorkOrderFiles(abstract_models.BaseModel):
     work_order = models.ForeignKey(WorkOrder, related_name='work_order', on_delete=models.CASCADE)
     file_name = models.CharField(max_length=255, blank=False, default='file name')
     files = models.FileField(upload_to='work_order_files/')
-    service = models.ForeignKey(ServicePages, related_name='work_order_files', on_delete=models.CASCADE)

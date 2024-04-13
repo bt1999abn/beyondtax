@@ -9,7 +9,7 @@ from datetime import timedelta
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer, \
     WorkOrderFilesSerializer
-from rest_framework.generics import CreateAPIView,ListAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, get_object_or_404
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, WorkOrder, ServicePages
 from accounts.services import SendMobileOtpService
@@ -125,8 +125,12 @@ class WorkOrderApiView(APIView):
 class WorkOrderApi(CreateAPIView):
     serializer_class = WorkOrderSerializer
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class GetWorkOrderApi(ListAPIView):
