@@ -14,6 +14,6 @@ urlpatterns = [
     path('logout-all/', LogoutAllView.as_view()),
     path('create-work-order/', views.WorkOrderApi.as_view()),
     path('list-work-order/', views.GetWorkOrderApi.as_view()),
-    path('delete-work-order/<int:pk>/', views.DeleteWorkOrderApi.as_view()),
+    path('upload-files/', accounts_api_views.WorkOrderFileUploadAPI.as_view(), name='upload-work-order-files'),
 
 ]

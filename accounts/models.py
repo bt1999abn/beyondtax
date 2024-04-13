@@ -165,10 +165,10 @@ class WorkOrder(abstract_models.BaseModel):
     amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'),  blank=False)
     status = models.CharField(choices=STATUS_CHOICES, null=True, blank=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_orders')
-    REQUIRED_FIELDS = ['service_name', 'amount_paid', 'status']
 
 
 class WorkOrderFiles(abstract_models.BaseModel):
-
+    work_order = models.ForeignKey(WorkOrder, related_name='work_order', on_delete=models.CASCADE)
+    file_name = models.CharField(max_length=255, blank=False, default='file name')
     files = models.FileField(upload_to='work_order_files/')
     service = models.ForeignKey(ServicePages, related_name='work_order_files', on_delete=models.CASCADE)

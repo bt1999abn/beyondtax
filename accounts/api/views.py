@@ -7,10 +7,11 @@ from rest_framework import status, serializers
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
-from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer
-from rest_framework.generics import CreateAPIView,ListAPIView,DestroyAPIView
+from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer, \
+    WorkOrderFilesSerializer
+from rest_framework.generics import CreateAPIView,ListAPIView
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord, WorkOrder
+from accounts.models import OtpRecord, WorkOrder, ServicePages
 from accounts.services import SendMobileOtpService
 
 
@@ -136,10 +137,17 @@ class GetWorkOrderApi(ListAPIView):
         return WorkOrder.objects.filter(user=user)
 
 
-class DeleteWorkOrderApi(DestroyAPIView):
-    serializer_class = WorkOrderSerializer
+class WorkOrderFileUploadAPI(APIView):
+    permission_classes = [IsAuthenticated]
 
-    queryset = WorkOrder.objects.all()
+    def post(self,request,*args,**kwargs):
+        serializer = WorkOrderFilesSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
