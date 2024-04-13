@@ -1,5 +1,4 @@
 from django.contrib.auth import login, get_user_model
-from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
@@ -8,10 +7,10 @@ from rest_framework import status, serializers
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
-from accounts.api.serializers import RegistrationSerializer , UserProfileSerializer
-from accounts.api.serializers import RegistrationSerializer
+from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer
+from rest_framework.generics import CreateAPIView,ListAPIView,DestroyAPIView
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord
+from accounts.models import OtpRecord, WorkOrder
 from accounts.services import SendMobileOtpService
 
 
@@ -115,6 +114,32 @@ class UpdateProfileApi(APIView):
             serializer.save()
             return Response({"message": "Profile updated successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkOrderApiView(APIView):
+
+    permission_classes = (IsAuthenticated,)
+
+
+class WorkOrderApi(CreateAPIView):
+    serializer_class = WorkOrderSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class GetWorkOrderApi(ListAPIView):
+    serializer_class = WorkOrderSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        return WorkOrder.objects.filter(user=user)
+
+
+class DeleteWorkOrderApi(DestroyAPIView):
+    serializer_class = WorkOrderSerializer
+
+    queryset = WorkOrder.objects.all()
 
 
 
