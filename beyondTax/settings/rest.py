@@ -22,10 +22,8 @@ CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = (
     'http://localhost:3000',
     'http://localhost:3001',
-    'http://localhost:3002',
-    'http://localhost:3003',
-    'https://beyondTax.com',
-    'https://coziqexperiences.com'
+    'https://www.beyondtaxindia.com/',
+    'https://beyondtaxindia.com/',
 )
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://\w+\.beyondtaxindia\.com$",
