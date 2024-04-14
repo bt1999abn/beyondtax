@@ -3,12 +3,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
 from rest_framework import serializers, request
 from django.contrib.auth.models import User  # Use get_user_model() if you have a custom user model
+from rest_framework.exceptions import ValidationError
+
 from accounts.models import User, WorkOrder, WorkOrderFiles, ServicePages
 
 
 class LoginSerializer(serializers.Serializer):
     mobile_number = serializers.CharField()
-    password = serializers.CharField()
+    password = serializers.CharField(max_length=128)
 
     def validate(self, attrs):
         mobile_number = attrs.get('mobile_number')
@@ -22,6 +24,7 @@ class LoginSerializer(serializers.Serializer):
             User.objects.get(mobile_number=mobile_number)
         except ObjectDoesNotExist:
             raise serializers.ValidationError("User does not exist.")
+
         user = authenticate(username=mobile_number, password=password)
         if user:
             attrs['user'] = user
@@ -37,7 +40,8 @@ class RegistrationSerializer(serializers.Serializer):
     )
     mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10)
     full_name = serializers.CharField()
-    date_of_birth = serializers.DateField()
+    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'])
+    password = serializers.CharField(max_length=128, required=False)
     state = serializers.ChoiceField(choices=User.STATES_CHOICES)
     email = serializers.CharField(required=False, allow_blank=True)
 
@@ -53,7 +57,9 @@ class RegistrationSerializer(serializers.Serializer):
         date_of_birth = attrs.get('date_of_birth')
         if not date_of_birth:
             raise serializers.ValidationError("Date of Birth is required field.")
-
+        password = attrs.get('password')
+        if not password:
+            raise serializers.ValidationError("password is required field.")
         state = attrs.get('state')
         if not state:
             raise serializers.ValidationError("Please select the state.")
@@ -76,6 +82,7 @@ class RegistrationSerializer(serializers.Serializer):
                     email=validated_data.get('email_id', ''),
                     is_active=False
                     )
+        user.set_password(validated_data['password'])
         user.save()
         return user
 
@@ -107,18 +114,35 @@ class UserProfileSerializer(serializers.Serializer):
 
 class WorkOrderSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.id')
+    service_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = WorkOrder
         fields = '__all__'
-        read_only_fields = ('user',)
+        read_only_fields = ('user', 'service')
+
+    def validate_service_id(self, value):
+
+        if not ServicePages.objects.filter(id=value).exists():
+            raise ValidationError(f"Service with ID {value} does not exist.")
+        return value
+
+    def create(self, validated_data):
+        service_id = validated_data.pop('service_id', None)
+        service = ServicePages.objects.get(id=service_id)
+        work_order = WorkOrder.objects.create(
+            user=self.context['request'].user,
+            service=service,
+            **validated_data
+        )
+        return work_order
 
 
 class WorkOrderFilesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkOrderFiles
-        fields=['work_order', 'file_name', 'files', 'service']
+        fields=['work_order', 'file_name', 'files',]
 
 
 

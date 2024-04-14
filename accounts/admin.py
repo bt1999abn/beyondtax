@@ -92,7 +92,7 @@ class WorkOrderFilesInline(admin.TabularInline):
 class WorkOrderAdmin(admin.ModelAdmin):
     inlines = [WorkOrderFilesInline, ]
     list_display = ('service_name', 'amount_paid', 'status', 'user')
-    # search_fields = ('service_name', 'user__username')
+    search_fields = ('service_name', 'user__username')
 
 
 # Now register the new UserAdmin...
