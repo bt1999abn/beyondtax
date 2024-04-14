@@ -28,7 +28,6 @@ CORS_ORIGIN_WHITELIST = (
     'https://coziqexperiences.com'
 )
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://\w+\.beyondTax\.com$",
-    r"^https://\w+\.coziqexperiences\.com$",
+    r"^https://\w+\.beyondtaxindia\.com$",
 ]
 
