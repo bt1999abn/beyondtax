@@ -6,3 +6,9 @@ class ServicePagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServicePages
         fields = '__all__'
+
+
+class ServicePagesListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServicePages
+        fields = ('id','service_title')

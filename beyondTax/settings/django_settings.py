@@ -31,7 +31,7 @@ INSTALLED_APPS = [
 
     # External packages
     'storages',
-    # 'corsheaders',
+    'corsheaders',
     'django_filters',
     'django_cleanup.apps.CleanupConfig',
     'rest_framework',
@@ -49,7 +49,7 @@ REST_FRAMEWORK = {
 }
 
 MIDDLEWARE = [
-    # 'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -140,7 +140,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-# CSRF_TRUSTED_ORIGINS = ['https://*.beyondtaxindia.com']
+CSRF_TRUSTED_ORIGINS = ['https://*.beyondtaxindia.com']
 
 INJECTION_MAPPINGS = PROJECT_APPS + ["shared"]
 
