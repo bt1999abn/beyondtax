@@ -8,6 +8,7 @@ cryptography==42.0.5
 dependency-injector==4.41.0
 Django==5.0.3
 django-admin-rangefilter==0.12.1
+django-ckeditor==6.7.1
 django-cleanup==8.1.0
 django-cors-headers==4.3.1
 django-environ==0.11.2
