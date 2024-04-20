@@ -1,8 +1,7 @@
 from rest_framework.exceptions import NotFound
-from rest_framework.views import APIView
+from blogs.models import BlogPost
 from rest_framework.generics import ListAPIView , RetrieveAPIView
 from blogs.serializers import BlogPostSerializer, BlogPostDetailSerializer
-from accounts.models import BlogPost
 
 
 class GetBlogPostApi(ListAPIView):

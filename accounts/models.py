@@ -181,8 +181,3 @@ class WorkOrderFiles(abstract_models.BaseModel):
     files = models.FileField(upload_to='work_order_files/')
 
 
-class BlogPost(abstract_models.BaseModel):
-    title = models.CharField(max_length=200)
-    description = models.TextField(default='Default description')
-    content = RichTextField()
-    category = models.CharField(max_length=100, blank=True, null=True)

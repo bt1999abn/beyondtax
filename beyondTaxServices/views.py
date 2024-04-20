@@ -1,8 +1,9 @@
 from django.shortcuts import render
+from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializers import ServicePagesSerializer
+from .serializers import ServicePagesSerializer, ServicePagesListSerializer
 from accounts.models import ServicePages
 
 
@@ -16,3 +17,9 @@ class ServicePagesApi(APIView):
             return Response({"message": "Service Page not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = ServicePagesSerializer(queryset, many=False)
         return Response({'data': serializer.data})
+
+
+class ListServicePagesApi(ListAPIView):
+    queryset = ServicePages.objects.all()
+    serializer_class = ServicePagesListSerializer
+
