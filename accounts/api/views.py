@@ -8,8 +8,8 @@ from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer, \
-    WorkOrderFilesSerializer
-from rest_framework.generics import CreateAPIView, ListAPIView, get_object_or_404
+    WorkOrderFilesSerializer, ChangePasswordSerializer
+from rest_framework.generics import CreateAPIView, ListAPIView
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, WorkOrder, ServicePages
 from accounts.services import SendMobileOtpService
@@ -57,13 +57,13 @@ class RegistrationApiView(APIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            print(user.mobile_number)
-            service = SendMobileOtpService()
-            success, result = service.send_otp(phone_number=user.mobile_number)
-            if success:
-                return Response({
+            # print(user.mobile_number)
+            # service = SendMobileOtpService()
+            # success, result = service.send_otp(phone_number=user.mobile_number)
+            # if success:
+            return Response({
                     'user_id': user.id,
-                    'otp_session_id': result
+                    # 'otp_session_id': result
                 }, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -151,6 +151,18 @@ class WorkOrderFileUploadAPI(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangePasswordAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self,request,*args,**kwargs):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = request.user
+            serializer.update(user, serializer.validated_data)
+            return Response({"messages":"password updated succesfully"}, status= status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

@@ -2,29 +2,21 @@ from django.contrib.auth import get_user_model, authenticate
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
 from rest_framework import serializers, request
-from django.contrib.auth.models import User  # Use get_user_model() if you have a custom user model
-from rest_framework.exceptions import ValidationError
-
+from django.contrib.auth.models import User
 from accounts.models import User, WorkOrder, WorkOrderFiles, ServicePages
 
 
 class LoginSerializer(serializers.Serializer):
-    mobile_number = serializers.CharField()
-    password = serializers.CharField(max_length=128)
+    mobile_number = serializers.CharField(required=True)
+    password = serializers.CharField(max_length=128,required=True)
 
     def validate(self, attrs):
         mobile_number = attrs.get('mobile_number')
-        if not mobile_number:
-            raise serializers.ValidationError("Mobile Number is required field.")
         password = attrs.get('password')
-
-        if not password:
-            raise serializers.ValidationError("Please give both email and password.")
         try:
             User.objects.get(mobile_number=mobile_number)
         except ObjectDoesNotExist:
             raise serializers.ValidationError("User does not exist.")
-
         user = authenticate(username=mobile_number, password=password)
         if user:
             attrs['user'] = user
@@ -38,31 +30,18 @@ class RegistrationSerializer(serializers.Serializer):
         regex=r'^[1-9][0-9]{9}$',
         message="Please enter a valid mobile number format."
     )
-    mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10)
-    full_name = serializers.CharField()
-    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'])
-    password = serializers.CharField(max_length=128, required=False)
-    state = serializers.ChoiceField(choices=User.STATES_CHOICES)
+    mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10, required=True)
+    full_name = serializers.CharField(required=True)
+    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'], required=True)
+    password = serializers.CharField(max_length=128, required=True)
+    state = serializers.ChoiceField(choices=User.STATES_CHOICES, required=True)
     email = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         mobile_number = attrs.get('mobile_number')
         if not mobile_number:
             raise serializers.ValidationError("Mobile Number is required field.")
-
         full_name = attrs.get('full_name')
-        if not full_name:
-            raise serializers.ValidationError("NAME is required field.")
-
-        date_of_birth = attrs.get('date_of_birth')
-        if not date_of_birth:
-            raise serializers.ValidationError("Date of Birth is required field.")
-        password = attrs.get('password')
-        if not password:
-            raise serializers.ValidationError("password is required field.")
-        state = attrs.get('state')
-        if not state:
-            raise serializers.ValidationError("Please select the state.")
         email = attrs.get('email')
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError("This email is already used.")
@@ -115,27 +94,28 @@ class UserProfileSerializer(serializers.Serializer):
 class WorkOrderSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.id')
     service_id = serializers.IntegerField(write_only=True)
+    service_name = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkOrder
         fields = '__all__'
-        read_only_fields = ('user', 'service')
+        read_only_fields = ('user', 'service', 'service_name')
+
+    def get_service_name(self, obj):
+        return obj.service.service_title if obj.service else None
 
     def validate_service_id(self, value):
-
-        if not ServicePages.objects.filter(id=value).exists():
-            raise ValidationError(f"Service with ID {value} does not exist.")
+        try:
+            service = ServicePages.objects.get(id=value)
+            self.context['service'] = service
+        except ServicePages.DoesNotExist:
+            raise serializers.ValidationError(f"Service with ID {value} does not exist.")
         return value
 
     def create(self, validated_data):
-        service_id = validated_data.pop('service_id', None)
-        service = ServicePages.objects.get(id=service_id)
-        work_order = WorkOrder.objects.create(
-            user=self.context['request'].user,
-            service=service,
-            **validated_data
-        )
-        return work_order
+        validated_data['service'] = self.context.get('service')
+        validated_data['user'] = self.context['request'].user
+        return WorkOrder.objects.create(**validated_data)
 
 
 class WorkOrderFilesSerializer(serializers.ModelSerializer):
@@ -143,6 +123,31 @@ class WorkOrderFilesSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkOrderFiles
         fields=['work_order', 'file_name', 'files',]
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    confirm_new_password = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        user= self.context['request'].user
+        old_password = attrs.get('old_password')
+        if not user.check_password(old_password):
+            raise serializers.ValidationError("Old Password is not correct")
+        new_password = attrs.get('new_password')
+        confirm_new_password = attrs.get('confirm_new_password')
+        if new_password != confirm_new_password:
+            raise serializers.ValidationError({"confirm_new_password": "New passwords must match."})
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.set_password(validated_data['new_password'])
+        instance.save()
+        return instance
+
+
+
 
 
 

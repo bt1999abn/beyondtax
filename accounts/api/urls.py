@@ -3,7 +3,8 @@ from accounts.api import views as accounts_api_views
 from knox.views import LogoutView, LogoutAllView
 from . import views
 
-urlpatterns = [
+urlpatterns =[
+
     path('login/', accounts_api_views.LoginAPIView.as_view(), name='send_otp'),
     path('send_otp/', accounts_api_views.sendOtpApi.as_view(), name='send_otp'),
     path('registration/', accounts_api_views.RegistrationApiView.as_view(), name='registering_user'),
@@ -15,5 +16,6 @@ urlpatterns = [
     path('create-work-order/', views.WorkOrderApi.as_view()),
     path('list-work-order/', views.GetWorkOrderApi.as_view()),
     path('upload-files/', accounts_api_views.WorkOrderFileUploadAPI.as_view(), name='upload-work-order-files'),
+    path('change-password/',accounts_api_views.ChangePasswordAPI.as_view(), name="change-password-api"),
 
 ]

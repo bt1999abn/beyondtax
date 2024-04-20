@@ -1,6 +1,6 @@
 import datetime
 from decimal import Decimal
-
+from ckeditor.fields import RichTextField
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -169,8 +169,20 @@ class WorkOrder(abstract_models.BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='work_orders')
     service = models.ForeignKey(ServicePages, related_name='work_order_files', null=True, on_delete=models.CASCADE)
 
+    def save(self, *args, **kwargs):
+        if self.service:
+            self.service_name = self.service.service_title
+        super(WorkOrder, self).save(*args, **kwargs)
+
 
 class WorkOrderFiles(abstract_models.BaseModel):
     work_order = models.ForeignKey(WorkOrder, related_name='work_order', on_delete=models.CASCADE)
     file_name = models.CharField(max_length=255, blank=False, default='file name')
     files = models.FileField(upload_to='work_order_files/')
+
+
+class BlogPost(abstract_models.BaseModel):
+    title = models.CharField(max_length=200)
+    description = models.TextField(default='Default description')
+    content = RichTextField()
+    category = models.CharField(max_length=100, blank=True, null=True)

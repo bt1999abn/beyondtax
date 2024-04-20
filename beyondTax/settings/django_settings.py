@@ -14,7 +14,7 @@ ALLOWED_HOSTS = ["localhost", "stage-api.beyondtaxindia.com"]
 PROJECT_APPS = [
     'accounts',
     'beyondTaxServices',
-
+    'blogs',
 ]
 
 # Application definition
@@ -31,12 +31,13 @@ INSTALLED_APPS = [
 
     # External packages
     'storages',
-    'corsheaders',
+    # 'corsheaders',
     'django_filters',
     'django_cleanup.apps.CleanupConfig',
     'rest_framework',
     'knox',
     'rangefilter',
+    'ckeditor',
 
 ] + PROJECT_APPS + [    # Config
     'beyondTax.apps.BoilerPlateConfig',
@@ -48,7 +49,7 @@ REST_FRAMEWORK = {
 }
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -139,7 +140,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-CSRF_TRUSTED_ORIGINS = ['https://*.beyondtaxindia.com']
+# CSRF_TRUSTED_ORIGINS = ['https://*.beyondtaxindia.com']
 
 INJECTION_MAPPINGS = PROJECT_APPS + ["shared"]
 
@@ -148,3 +149,5 @@ PRELOAD_ALPHAID_LIMIT = 100000
 DATETIME_INPUT_FORMATS = base_settings.BASE_INPUT_DATETIME_FORMATS
 TIME_INPUT_FORMATS = base_settings.BASE_TIME_INPUT_FORMATS
 X_FRAME_OPTIONS = "SAMEORIGIN"
+
+CKEDITOR_UPLOAD_PATH = "uploads/"

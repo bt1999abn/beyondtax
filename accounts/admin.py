@@ -1,9 +1,9 @@
+from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-# For automatically registering all the apps
 from accounts import models as accounts_models
-from accounts.models import WorkOrderFiles, WorkOrder
+from accounts.models import WorkOrderFiles, WorkOrder, BlogPost
 
 
 class UserCreationForm(forms.ModelForm):
@@ -95,9 +95,23 @@ class WorkOrderAdmin(admin.ModelAdmin):
     search_fields = ('service_name', 'user__username')
 
 
+class BlogPostAdminForm(forms.ModelForm):
+    content = forms.CharField(widget=CKEditorUploadingWidget())
+
+    class Meta:
+        model = BlogPost
+        fields = '__all__'
+
+
+class BlogPostAdmin(admin.ModelAdmin):
+    form = BlogPostAdminForm
+    list_display = ('title', 'content', 'category')
+
+
 # Now register the new UserAdmin...
 admin.site.register(accounts_models.User, UserAdmin)
 admin.site.register(WorkOrder, WorkOrderAdmin)
+admin.site.register(BlogPost, BlogPostAdmin)
 # # ... and, since we're not using Django's built-in permissions,
 # # unregister the Group model from admin_panel.
 # admin_panel.site.unregister(Group)
