@@ -13,6 +13,7 @@ from rest_framework.generics import CreateAPIView, ListAPIView
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, WorkOrder, ServicePages
 from accounts.services import SendMobileOtpService
+from shared.rest.pagination import CustomPagination
 
 
 class sendOtpApi(APIView):
@@ -135,6 +136,7 @@ class WorkOrderApi(CreateAPIView):
 
 class GetWorkOrderApi(ListAPIView):
     serializer_class = WorkOrderSerializer
+    pagination_class = CustomPagination
 
     def get_queryset(self):
         user = self.request.user
