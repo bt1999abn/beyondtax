@@ -1,9 +1,9 @@
-from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
 from accounts.models import WorkOrderFiles, WorkOrder
+from accounts.proxy_models import ProductProxy
 
 
 class UserCreationForm(forms.ModelForm):
@@ -95,9 +95,16 @@ class WorkOrderAdmin(admin.ModelAdmin):
     search_fields = ('service_name', 'user__username')
 
 
+class ProductProxyAdmin(admin.ModelAdmin):
+
+    list_display = ('product_name', 'amount', 'discount', 'government_fee', 'due_date', 'due_duration')
+    list_filter = ('category', 'client_type', 'frequency')
+
+
 # Now register the new UserAdmin...
 admin.site.register(accounts_models.User, UserAdmin)
 admin.site.register(WorkOrder, WorkOrderAdmin)
+admin.site.register(ProductProxy, ProductProxyAdmin)
 # # ... and, since we're not using Django's built-in permissions,
 # # unregister the Group model from admin_panel.
 # admin_panel.site.unregister(Group)

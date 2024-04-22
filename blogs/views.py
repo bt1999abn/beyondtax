@@ -1,6 +1,6 @@
 from rest_framework.exceptions import NotFound
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from blogs.models import BlogPost
-from rest_framework.generics import ListAPIView , RetrieveAPIView
 from blogs.serializers import BlogPostSerializer, BlogPostDetailSerializer
 
 

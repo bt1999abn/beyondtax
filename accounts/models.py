@@ -1,6 +1,5 @@
 import datetime
 from decimal import Decimal
-from ckeditor.fields import RichTextField
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -137,6 +136,35 @@ class OtpRecord(abstract_models.BaseModel):
 
 
 class ServicePages(abstract_models.BaseModel):
+    BusinessEssentials, TaxRelated, EntityFormation, IncomeTax, GST, Accounting, CompanyCompliance, TDS = 1, 2, 3, 4, 5, 6, 7, 8
+    CATEGORY_CHOICES = (
+        (BusinessEssentials, "Business Essentials"),
+        (TaxRelated, "Tax Related"),
+        (EntityFormation, "Entity Formation"),
+        (IncomeTax, "Income Tax"),
+        (GST, "GST"),
+        (Accounting, "Accounting"),
+        (CompanyCompliance, "Company Compliance"),
+        (TDS, "TDS"),
+    )
+    Individual, Proprietorship, Firm, LLP, Company, Trust = 1, 2, 3, 4, 5, 6
+    CLIENT_TYPE_CHOICES = (
+        (Individual, "Individual"),
+        (Proprietorship, "Proprietorship"),
+        (Firm, "Firm"),
+        (LLP, "LLP"),
+        (Company, "Company"),
+        (Trust, "Trust"),
+    )
+    Daily, Weekly, Monthly, Quarterly, HalfYearly, Yearly = 1, 2, 3, 4, 5, 6
+    FREQUENCY_CHOICES =(
+        (Daily, "Daily"),
+        (Weekly, "Weekly"),
+        (Monthly, "Monthly"),
+        (Quarterly, "Quarterly"),
+        (HalfYearly, "Half-Yearly"),
+        (Yearly, "Yearly"),
+    )
     service_title = models.CharField(max_length=255 , default='Default Title')
     service_description = models.TextField(default='Default description')
     certificate_price = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
@@ -154,6 +182,14 @@ class ServicePages(abstract_models.BaseModel):
     updated_at= models.DateTimeField(auto_now_add=True)
     slug = models.SlugField(unique=True, blank=True)
     required_documents = models.JSONField(default=dict)
+    category = models.IntegerField(choices=CATEGORY_CHOICES, null=True, blank=True, default=None)
+    client_type = models.IntegerField(choices=CLIENT_TYPE_CHOICES, null=True, blank=True, default=None)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="listing_price")
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="effective_price")
+    due_date = models.DateField(null=True, blank=True)
+    government_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    due_duration = models.PositiveIntegerField(default=10)
+    frequency = models.IntegerField(choices=FREQUENCY_CHOICES, null=True, blank=True, default=None)
 
 
 class WorkOrder(abstract_models.BaseModel):
