@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
-from accounts.models import WorkOrderFiles, WorkOrder
+from accounts.models import WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument
 from accounts.proxy_models import ProductProxy
 
 
@@ -66,7 +66,9 @@ class UserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {'fields': ('email', 'password', 'mobile_number')}),
         ('Personal info', {
-            'fields': ('first_name', 'last_name', 'date_of_birth', 'is_active', 'is_staff', 'is_superuser')
+            'fields': ('first_name', 'last_name', 'date_of_birth', 'is_active', 'is_staff', 'is_superuser','client_type',
+                       'industry_type', 'nature_of_business', 'contact_person', 'job_title', 'contact_person_phone_number',
+                       'contact_email')
         }),
         ('Permissions', {'fields': ('user_permissions', "groups")}),
     )
@@ -84,13 +86,18 @@ class UserAdmin(BaseUserAdmin):
     filter_horizontal = ("user_permissions",)
 
 
-class WorkOrderFilesInline(admin.TabularInline):
-    model = WorkOrderFiles
+class WorkOrderDocumentsInline(admin.TabularInline):
+    model = WorkOrderDocument
+    extra = 1
+
+
+class WorkOrderDownloadDocumentInLine(admin.TabularInline):
+    model = WorkOrderDownloadDocument
     extra = 1
 
 
 class WorkOrderAdmin(admin.ModelAdmin):
-    inlines = [WorkOrderFilesInline, ]
+    inlines = [WorkOrderDocumentsInline, WorkOrderDownloadDocumentInLine,]
     list_display = ('service_name', 'amount_paid', 'status', 'user')
     search_fields = ('service_name', 'user__username')
 
