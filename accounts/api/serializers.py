@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
 from rest_framework import serializers, request
 from django.contrib.auth.models import User
-from accounts.models import User, WorkOrder, WorkOrderFiles, ServicePages
+from accounts.models import User, WorkOrder, ServicePages, WorkOrderDocument, WorkOrderDownloadDocument
 
 
 class LoginSerializer(serializers.Serializer):
@@ -77,8 +78,24 @@ class UserProfileSerializer(serializers.Serializer):
     date_of_birth = serializers.DateField()
     state = serializers.ChoiceField(choices=User.STATES_CHOICES)
     email = serializers.CharField(required=False, allow_blank=True)
+    password = serializers.CharField(required=False)
+    confirm_password = serializers.CharField(required=False)
+    client_type = serializers.ChoiceField(choices=User.CLIENT_TYPE_CHOICES)
+    industry_type = serializers.ChoiceField(choices=User.INDUSTRY_TYPE_CHOICES)
+    nature_of_business = serializers.ChoiceField(choices=User.NATURE_OF_BUSINESS_CHOICES)
+    contact_person = serializers.CharField(max_length=255, required=False)
+    job_title = serializers.CharField(max_length=255, required=False)
+    contact_person_phone_number = serializers.CharField(max_length=10, required=False)
+    contact_mail = serializers.CharField(max_length=255)
+
+    def validate(self, data):
+        if data["password"] != data["confirm_password"]:
+            raise serializers.ValidationError("Passwords do not match")
+        return data
 
     def update(self, instance, validated_data):
+        if 'password' in validated_data:
+            instance.password = make_password(validated_data['password'])
         instance.mobile_number = validated_data.get('mobile_number', instance.mobile_number)
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)
@@ -87,6 +104,14 @@ class UserProfileSerializer(serializers.Serializer):
         instance.state = validated_data.get('state', instance.state)
         if 'email' in validated_data:
             instance.email = validated_data['email']
+        instance.client_type = validated_data.get('client_type', instance.client_type)
+        instance.industry_type = validated_data.get('industry_type', instance.industry_type)
+        instance.nature_of_business = validated_data.get('nature_of_business', instance.nature_of_business)
+        instance.contact_person = validated_data.get('contact_person', instance.contact_person)
+        instance.job_title = validated_data.get('job_title', instance.job_title)
+        instance.contact_person_phone_number = validated_data.get('contact_person_phone_number',
+                                                                  instance.contact_person_phone_number)
+        instance.contact_email = validated_data.get('contact_email', instance.contact_email)
         instance.save()
         return instance
 
@@ -95,11 +120,17 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.id')
     service_id = serializers.IntegerField(write_only=True)
     service_name = serializers.SerializerMethodField()
+    required_documents_list = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkOrder
         fields = '__all__'
         read_only_fields = ('user', 'service', 'service_name')
+
+    def get_required_documents_list(self, obj):
+        if obj.service:
+            return obj.service.get_required_documents_list()
+        return []
 
     def get_service_name(self, obj):
         return obj.service.service_title if obj.service else None
@@ -118,11 +149,40 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         return WorkOrder.objects.create(**validated_data)
 
 
-class WorkOrderFilesSerializer(serializers.ModelSerializer):
+class WorkOrderDocumentsSerializer(serializers.ModelSerializer):
+    work_order_id = serializers.IntegerField(write_only=True)
+    document_name = serializers.CharField(max_length=255)
+    document_file = serializers.FileField()
 
     class Meta:
-        model = WorkOrderFiles
-        fields=['work_order', 'file_name', 'files',]
+        model = WorkOrderDocument
+        fields=['work_order_id', 'document_name', 'document_file']
+
+    def validate_work_order_id(self, value):
+        try:
+            work_order_id = WorkOrder.objects.get(id=value)
+        except WorkOrder.DoesNotExist:
+            raise serializers.ValidationError(f"Work order with ID {value} does not exist.")
+
+        # Store the work order in the serializer context for further use
+        self.context['work_order'] = work_order_id
+        return value
+
+    def validate_document_name(self, value):
+        # Get the work order from the context
+        work_order = self.context.get('work_order')
+
+        if not work_order:
+            raise serializers.ValidationError("Work order must be provided to validate document name.")
+
+        # Get the list of required documents from the associated ServicePages
+        required_docs_list = work_order.service.get_required_documents_list()
+
+        if value not in required_docs_list:
+            raise serializers.ValidationError(
+                f"Document name '{value}' is not in the required documents list: {required_docs_list}")
+
+        return value
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -147,6 +207,30 @@ class ChangePasswordSerializer(serializers.Serializer):
         return instance
 
 
+class UserBasicDetailsSerializer(serializers.Serializer):
+    full_name = serializers.SerializerMethodField()
+    mobile_number = serializers.CharField(max_length=10)
+    date_of_birth = serializers.DateField()
+    email = serializers.EmailField()
+
+    def get_full_name(self, obj):
+        first_name = obj.first_name or ""
+        last_name = obj.last_name or ""
+        return f"{first_name} {last_name}".strip()
+
+
+class WorkOrderDownloadDocumentSerializer(serializers.Serializer):
+    document_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkOrderDownloadDocument
+        fields = ['id', 'work_order', 'download_document', 'description', 'document_url']
+
+    def get_document_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.document_file.url)
+        return None
 
 
 

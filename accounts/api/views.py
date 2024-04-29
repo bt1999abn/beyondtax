@@ -1,17 +1,19 @@
 from django.contrib.auth import login, get_user_model
+from django.db.models import Sum
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, serializers
+from rest_framework import status, serializers, generics
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer, \
-    WorkOrderFilesSerializer, ChangePasswordSerializer
+    ChangePasswordSerializer, WorkOrderDocumentsSerializer, WorkOrderDownloadDocumentSerializer, \
+    UserBasicDetailsSerializer
 from rest_framework.generics import CreateAPIView, ListAPIView
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord, WorkOrder, ServicePages
+from accounts.models import OtpRecord, WorkOrder, WorkOrderDocument
 from accounts.services import SendMobileOtpService
 from shared.rest.pagination import CustomPagination
 
@@ -143,17 +145,10 @@ class GetWorkOrderApi(ListAPIView):
         return WorkOrder.objects.filter(user=user)
 
 
-class WorkOrderFileUploadAPI(APIView):
+class WorkOrderDocumentUploadAPI(generics.CreateAPIView):
+    queryset = WorkOrderDocument.objects.all()
+    serializer_class = WorkOrderDocumentsSerializer
     permission_classes = [IsAuthenticated]
-
-    def post(self,request,*args,**kwargs):
-        serializer = WorkOrderFilesSerializer(data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ChangePasswordAPI(APIView):
@@ -168,9 +163,48 @@ class ChangePasswordAPI(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class WorkOrderDocumentApi(ListAPIView):
+    serializer_class = WorkOrderDownloadDocumentSerializer
+    permission_classes = (IsAuthenticated,)
 
 
+class WorkOrderStatusSummaryApi(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self,request,*args,**kwargs):
+        user = request.user
+        user_workorders = WorkOrder.objects.filter(user=user)
+        inprocess_count = WorkOrder.objects.filter(status=1).count()
+        download_count = WorkOrder.objects.filter(status=2).count()
+        total_amount_paid = WorkOrder.objects.aggregate(Sum('amount_paid'))
+        data = {
+            "inprocess_count": inprocess_count,
+            "download_count": download_count,
+            "total_amount_paid": total_amount_paid if total_amount_paid else 0
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class UserBasicDetailsApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        serializer = UserBasicDetailsSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class WorkOrderDocumentListView(generics.ListAPIView):
+    serializer_class = WorkOrderDownloadDocumentSerializer
+    permission_classes = [IsAuthenticated]  # Ensure only authorized users can access
+    queryset = WorkOrderDocument.objects.all()  # Retrieve all documents
+
+    def get_queryset(self):
+        # Example: filter by work order status
+        status = self.request.query_params.get('status')  # Get status from query parameters
+        if status:
+            return self.queryset.filter(work_order__status=status)  # Return documents matching status
+        return self.queryset
 
 
 
