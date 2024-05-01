@@ -4,16 +4,18 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, serializers, generics
+from rest_framework import status, serializers, generics, request
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, WorkOrderSerializer, \
-    ChangePasswordSerializer, WorkOrderDocumentsSerializer, WorkOrderDownloadDocumentSerializer, \
-    UserBasicDetailsSerializer
+    ChangePasswordSerializer, WorkOrderDownloadDocumentSerializer, \
+    UserBasicDetailsSerializer, WorkOrderDownloadDocumentListSerializer, WorkorderPaymentSerializer, \
+    UpcomingDueDateSerializer, WorkOrderDocumentsUploadSerializer
 from rest_framework.generics import CreateAPIView, ListAPIView
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord, WorkOrder, WorkOrderDocument
+from accounts.models import OtpRecord, WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument, WorkorderPayment, \
+    UpcomingDueDates
 from accounts.services import SendMobileOtpService
 from shared.rest.pagination import CustomPagination
 
@@ -147,8 +149,24 @@ class GetWorkOrderApi(ListAPIView):
 
 class WorkOrderDocumentUploadAPI(generics.CreateAPIView):
     queryset = WorkOrderDocument.objects.all()
-    serializer_class = WorkOrderDocumentsSerializer
+    serializer_class = WorkOrderDocumentsUploadSerializer
     permission_classes = [IsAuthenticated]
+
+
+class WorkOrderDocumentUploadByBeyondtaxAPI(generics.CreateAPIView):
+    queryset = WorkOrderDocument.objects.all()
+    serializer_class = WorkOrderDocumentsUploadSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        data['uploaded_by_beyondtax'] = True
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class ChangePasswordAPI(APIView):
@@ -194,17 +212,51 @@ class UserBasicDetailsApi(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class WorkOrderDocumentListView(generics.ListAPIView):
+class WorkOrderDownloadDocumentApi(generics.RetrieveAPIView):
     serializer_class = WorkOrderDownloadDocumentSerializer
-    permission_classes = [IsAuthenticated]  # Ensure only authorized users can access
-    queryset = WorkOrderDocument.objects.all()  # Retrieve all documents
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self,*args,**kwargs):
+        work_order_id = self.kwargs.get('work_order_id')
+        if not work_order_id:
+            raise ValueError("WorkOrder ID is required.")
+        try:
+            document = WorkOrderDownloadDocument.objects.get(work_order_id=work_order_id)
+            return document
+        except WorkOrderDownloadDocument.DoesNotExist:
+            raise serializers.ValidationError(f"No document found for WorkOrder ID {work_order_id}.")
+
+
+class WorkOrderDownloadDocumentListApi(generics.ListAPIView):
+    serializer_class = WorkOrderDownloadDocumentListSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Example: filter by work order status
-        status = self.request.query_params.get('status')  # Get status from query parameters
-        if status:
-            return self.queryset.filter(work_order__status=status)  # Return documents matching status
-        return self.queryset
+        user = self.request.user
+        return WorkOrderDownloadDocument.objects.filter(work_order__user=user, work_order__status=5)
+
+
+class WorkorderPaymentRetriveApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, work_order_id):
+        try:
+            work_order = WorkOrder.objects.get(id=work_order_id)
+        except WorkOrder.DoesNotExist:
+            return Response({"error": f"No WorkOrder found with ID {work_order_id}"}, status=status.HTTP_404_NOT_FOUND)
+        payments = WorkorderPayment.objects.filter(work_order=work_order)
+        if not payments.exists():
+            return Response({"error": f"No payments found for WorkOrder ID {work_order_id}"},
+                            status=status.HTTP_404_NOT_FOUND)
+        serializer = WorkorderPaymentSerializer(payments, many=True)
+
+        return Response(serializer.data)
+
+
+class UpcomingDueDatesApi(generics.RetrieveAPIView):
+    queryset = UpcomingDueDates.objects.all()
+    serializer_class = UpcomingDueDateSerializer
+
 
 
 

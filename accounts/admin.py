@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
-from accounts.models import WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument
+from accounts.models import WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument, WorkorderPayment, UpcomingDueDates
 from accounts.proxy_models import ProductProxy
 
 
@@ -96,8 +96,13 @@ class WorkOrderDownloadDocumentInLine(admin.TabularInline):
     extra = 1
 
 
+class WorkOrderPaymentInline(admin.TabularInline):
+    model = WorkorderPayment
+    extra = 1
+
+
 class WorkOrderAdmin(admin.ModelAdmin):
-    inlines = [WorkOrderDocumentsInline, WorkOrderDownloadDocumentInLine,]
+    inlines = [WorkOrderDocumentsInline, WorkOrderDownloadDocumentInLine, WorkOrderPaymentInline,]
     list_display = ('service_name', 'amount_paid', 'status', 'user')
     search_fields = ('service_name', 'user__username')
 
@@ -108,10 +113,17 @@ class ProductProxyAdmin(admin.ModelAdmin):
     list_filter = ('category', 'client_type', 'frequency')
 
 
+class UpcomingDueDateAdmin(admin.ModelAdmin):
+    list_display = ['id']
+    search_fields = ['data']
+    ordering = ['id']
+
+
 # Now register the new UserAdmin...
 admin.site.register(accounts_models.User, UserAdmin)
 admin.site.register(WorkOrder, WorkOrderAdmin)
 admin.site.register(ProductProxy, ProductProxyAdmin)
+admin.site.register(UpcomingDueDates, UpcomingDueDateAdmin)
 # # ... and, since we're not using Django's built-in permissions,
 # # unregister the Group model from admin_panel.
 # admin_panel.site.unregister(Group)
