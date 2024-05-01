@@ -2,9 +2,12 @@ from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
-from rest_framework import serializers, request
+from rest_framework import serializers, request, status
 from django.contrib.auth.models import User
-from accounts.models import User, WorkOrder, ServicePages, WorkOrderDocument, WorkOrderDownloadDocument
+from rest_framework.response import Response
+
+from accounts.models import User, WorkOrder, ServicePages, WorkOrderDocument, WorkOrderDownloadDocument, \
+    WorkorderPayment, UpcomingDueDates
 
 
 class LoginSerializer(serializers.Serializer):
@@ -149,35 +152,28 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         return WorkOrder.objects.create(**validated_data)
 
 
-class WorkOrderDocumentsSerializer(serializers.ModelSerializer):
+class WorkOrderDocumentsUploadSerializer(serializers.ModelSerializer):
     work_order_id = serializers.IntegerField(write_only=True)
     document_name = serializers.CharField(max_length=255)
     document_file = serializers.FileField()
 
     class Meta:
         model = WorkOrderDocument
-        fields=['work_order_id', 'document_name', 'document_file']
+        fields=['work_order_id', 'document_name', 'document_file',  'uploaded_by_beyondtax']
 
     def validate_work_order_id(self, value):
         try:
             work_order_id = WorkOrder.objects.get(id=value)
         except WorkOrder.DoesNotExist:
             raise serializers.ValidationError(f"Work order with ID {value} does not exist.")
-
-        # Store the work order in the serializer context for further use
         self.context['work_order'] = work_order_id
         return value
 
     def validate_document_name(self, value):
-        # Get the work order from the context
         work_order = self.context.get('work_order')
-
         if not work_order:
             raise serializers.ValidationError("Work order must be provided to validate document name.")
-
-        # Get the list of required documents from the associated ServicePages
         required_docs_list = work_order.service.get_required_documents_list()
-
         if value not in required_docs_list:
             raise serializers.ValidationError(
                 f"Document name '{value}' is not in the required documents list: {required_docs_list}")
@@ -229,9 +225,37 @@ class WorkOrderDownloadDocumentSerializer(serializers.Serializer):
     def get_document_url(self, obj):
         request = self.context.get('request')
         if request:
-            return request.build_absolute_uri(obj.document_file.url)
+            return request.build_absolute_uri(obj.download_document.url)
         return None
 
 
+class WorkOrderDownloadDocumentListSerializer(serializers.Serializer):
+    document_url = serializers.SerializerMethodField()
+    wo_dept = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkOrderDownloadDocument
+        fields = ['id', 'work_order', 'download_document', 'description', 'wo_dept',
+                  'document_url']
+
+    def get_document_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.download_document.url)
+        return None
+
+    def get_wo_dept(self, obj):
+        return obj.work_order.wo_dept if obj.work_order else None
 
 
+class WorkorderPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkorderPayment
+        fields = ['work_order', 'bank_account', 'ifsc_code', 'recipient_name', 'qr_code_url',
+                  'amount_due']
+
+
+class UpcomingDueDateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UpcomingDueDates
+        fields = ['data']

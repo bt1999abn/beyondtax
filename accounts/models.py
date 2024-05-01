@@ -245,10 +245,10 @@ class WorkOrder(abstract_models.BaseModel):
     wo_dept = models.CharField(max_length=255, blank=True)
     requested_by = models.CharField(max_length=255, blank=True)
     client_id = models.IntegerField(blank=True, null=True)
-    client_type = models.CharField(max_length=255, blank=True)
+    client_type = models.CharField(max_length=255, blank=False)
     due_date = models.DateField(blank=True, null=True)
     location = models.CharField(max_length=255, blank=True)
-    frequency = models.CharField(max_length=255, blank=True)
+    frequency = models.CharField(max_length=255, blank=False)
     schedule_date = models.DateField(blank=True, null=True)
     schedule_time = models.TimeField(blank=True, null=True)
     started_on = models.DateTimeField(blank=True, null=True)
@@ -267,17 +267,40 @@ class WorkOrder(abstract_models.BaseModel):
             self.client_type = self.user.client_type
         super(WorkOrder, self).save(*args, **kwargs)
 
+    def __str__(self):
+        return f"WorkOrder ID: {self.id} for {self.service_name}"
+
 
 class WorkOrderDocument(abstract_models.BaseModel):
     work_order = models.ForeignKey(WorkOrder, related_name='work_order', on_delete=models.CASCADE)
     document_name = models.CharField(max_length=255, blank=False, default='file name')
     document_file = models.FileField(upload_to='work_order_document_files/')
+    uploaded_by_beyondtax = models.BooleanField(default=False)
 
 
 class WorkOrderDownloadDocument(abstract_models.BaseModel):
     work_order = models.ForeignKey('WorkOrder', on_delete=models.CASCADE)
     download_document = models.FileField(upload_to='work_order_download_documents/')
     description = models.CharField(max_length=255, blank=True)
+
+
+class WorkorderPayment(abstract_models.BaseModel):
+    work_order = models.ForeignKey(WorkOrder, related_name='payments', on_delete=models.CASCADE)
+    bank_account = models.CharField(max_length=255)
+    ifsc_code = models.CharField(max_length=11)
+    recipient_name = models.CharField(max_length=255)
+    qr_code_url = models.URLField()
+    amount_due = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"Payment for WorkOrder ID: {self.work_order.id}"
+
+
+class UpcomingDueDates(abstract_models.BaseModel):
+    data = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"UpcomingDueDates ID: {self.id}"
 
 
 
