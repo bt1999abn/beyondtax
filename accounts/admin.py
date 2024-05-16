@@ -4,6 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
 from accounts.models import WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument, WorkorderPayment, UpcomingDueDates
 from accounts.proxy_models import ProductProxy
+from payments.models import Payment
 
 
 class UserCreationForm(forms.ModelForm):
@@ -19,7 +20,6 @@ class UserCreationForm(forms.ModelForm):
         fields = ('email', 'first_name', 'last_name', 'date_of_birth', 'mobile_number')
 
     def clean_password2(self):
-        # Check that the two password entries match
         password1 = self.cleaned_data.get("password1")
         password2 = self.cleaned_data.get("password2")
         if password1 and password2 and password1 != password2:
@@ -27,7 +27,6 @@ class UserCreationForm(forms.ModelForm):
         return password2
 
     def save(self, commit=True):
-        # Save the provided password in hashed format
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password1"])
         if commit:
@@ -97,7 +96,7 @@ class WorkOrderDownloadDocumentInLine(admin.TabularInline):
 
 
 class WorkOrderPaymentInline(admin.TabularInline):
-    model = WorkorderPayment
+    model = Payment
     extra = 1
 
 

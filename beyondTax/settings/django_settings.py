@@ -15,6 +15,7 @@ PROJECT_APPS = [
     'accounts',
     'beyondTaxServices',
     'blogs',
+    'payments',
 ]
 
 # Application definition
