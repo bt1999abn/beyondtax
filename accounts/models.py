@@ -123,6 +123,7 @@ class User(abstract_models.BaseModel, AbstractUser):
     is_active = models.BooleanField(default=False)
     email = models.CharField(max_length=255, blank=True)
     client_type = models.IntegerField(choices=CLIENT_TYPE_CHOICES, null=True, blank=True, default=None)
+    profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     industry_type = models.CharField(choices=INDUSTRY_TYPE_CHOICES, null=True, blank=True, default="PLEASE SELECT INDUSTRY TYPE")
     nature_of_business = models.CharField(choices=NATURE_OF_BUSINESS_CHOICES, null=True, blank=True, default="PLEASE SELECT Nature of business")
     contact_person = models.CharField(max_length=255, blank=True)
@@ -142,8 +143,16 @@ class User(abstract_models.BaseModel, AbstractUser):
         last_name = " ".join(word.capitalize() for word in self.last_name.split()) if self.last_name else ''
         return f'{first_name} {last_name}'.strip()
 
+    def get_profile_title(self):
+        if self.first_name and self.last_name:
+            return f"{self.first_name[0].upper()}{self.last_name[0].upper()}"
+        return None
+
     def full_name(self):
         return self.get_full_name()
+
+    def profile_title(self):
+        return self.get_profile_title()
 
     def is_admin(self):
         return self.is_staff
@@ -245,10 +254,10 @@ class WorkOrder(abstract_models.BaseModel):
     wo_dept = models.CharField(max_length=255, blank=True)
     requested_by = models.CharField(max_length=255, blank=True)
     client_id = models.IntegerField(blank=True, null=True)
-    client_type = models.CharField(max_length=255, blank=False)
+    client_type = models.CharField(max_length=255, blank=True)
     due_date = models.DateField(blank=True, null=True)
     location = models.CharField(max_length=255, blank=True)
-    frequency = models.CharField(max_length=255, blank=False)
+    frequency = models.CharField(max_length=255, blank=True)
     schedule_date = models.DateField(blank=True, null=True)
     schedule_time = models.TimeField(blank=True, null=True)
     started_on = models.DateTimeField(blank=True, null=True)

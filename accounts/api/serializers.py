@@ -78,7 +78,7 @@ class UserProfileSerializer(serializers.Serializer):
     mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10)
     first_name = serializers.CharField(max_length=255, required=False)
     last_name = serializers.CharField(max_length=255, required=False)
-    date_of_birth = serializers.DateField()
+    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'])
     state = serializers.ChoiceField(choices=User.STATES_CHOICES)
     email = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(required=False)
@@ -90,11 +90,17 @@ class UserProfileSerializer(serializers.Serializer):
     job_title = serializers.CharField(max_length=255, required=False)
     contact_person_phone_number = serializers.CharField(max_length=10, required=False)
     contact_mail = serializers.CharField(max_length=255)
+    profile_picture = serializers.ImageField(required=False, allow_null=True, allow_empty_file=True)
 
     def validate(self, data):
         if data["password"] != data["confirm_password"]:
             raise serializers.ValidationError("Passwords do not match")
         return data
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['profile_title'] = instance.get_profile_title()
+        return representation
 
     def update(self, instance, validated_data):
         if 'password' in validated_data:
@@ -115,6 +121,7 @@ class UserProfileSerializer(serializers.Serializer):
         instance.contact_person_phone_number = validated_data.get('contact_person_phone_number',
                                                                   instance.contact_person_phone_number)
         instance.contact_email = validated_data.get('contact_email', instance.contact_email)
+        instance.profile_picture = validated_data.get('profile_picture',instance.profile_picture)
         instance.save()
         return instance
 
@@ -152,33 +159,50 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         return WorkOrder.objects.create(**validated_data)
 
 
-class WorkOrderDocumentsUploadSerializer(serializers.ModelSerializer):
-    work_order_id = serializers.IntegerField(write_only=True)
+class DocumentSerializer(serializers.ModelSerializer):
     document_name = serializers.CharField(max_length=255)
     document_file = serializers.FileField()
 
     class Meta:
         model = WorkOrderDocument
-        fields=['work_order_id', 'document_name', 'document_file',  'uploaded_by_beyondtax']
+        fields = ['document_name', 'document_file']
+
+
+class WorkOrderDocumentsUploadSerializer(serializers.ModelSerializer):
+    work_order_id = serializers.IntegerField(write_only=True)
+    documents = DocumentSerializer(many=True, write_only=True)
+
+    class Meta:
+        model = WorkOrderDocument
+        fields = ['work_order_id', 'documents']
 
     def validate_work_order_id(self, value):
         try:
-            work_order_id = WorkOrder.objects.get(id=value)
+            work_order = WorkOrder.objects.get(id=value)
         except WorkOrder.DoesNotExist:
             raise serializers.ValidationError(f"Work order with ID {value} does not exist.")
-        self.context['work_order'] = work_order_id
+        self.context['work_order'] = work_order
         return value
 
-    def validate_document_name(self, value):
+    def validate_documents(self, value):
         work_order = self.context.get('work_order')
         if not work_order:
-            raise serializers.ValidationError("Work order must be provided to validate document name.")
+            raise serializers.ValidationError("Work order must be provided to validate document names.")
         required_docs_list = work_order.service.get_required_documents_list()
-        if value not in required_docs_list:
-            raise serializers.ValidationError(
-                f"Document name '{value}' is not in the required documents list: {required_docs_list}")
-
+        for document in value:
+            if document['document_name'] not in required_docs_list:
+                raise serializers.ValidationError(
+                    f"Document name '{document['document_name']}' is not in the required documents list: {required_docs_list}")
         return value
+
+    def create(self, validated_data):
+        work_order = self.context['work_order']
+        documents = validated_data.pop('documents')
+        uploaded_by_beyondtax = self.context['uploaded_by_beyondtax']
+        for document_data in documents:
+            WorkOrderDocument.objects.create(work_order=work_order, uploaded_by_beyondtax=uploaded_by_beyondtax,
+                                             **document_data)
+        return work_order
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -208,11 +232,16 @@ class UserBasicDetailsSerializer(serializers.Serializer):
     mobile_number = serializers.CharField(max_length=10)
     date_of_birth = serializers.DateField()
     email = serializers.EmailField()
+    profile_picture = serializers.ImageField()
+    profile_title = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         first_name = obj.first_name or ""
         last_name = obj.last_name or ""
         return f"{first_name} {last_name}".strip()
+
+    def get_profile_title(self, obj):
+        return obj.profile_title()
 
 
 class WorkOrderDownloadDocumentSerializer(serializers.Serializer):
