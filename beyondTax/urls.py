@@ -35,4 +35,5 @@ urlpatterns = [
     path('beyondTaxServices/', include('beyondTaxServices.urls')),
     path('ckeditor/', include('ckeditor_uploader.urls')),
     path('blogs/', include('blogs.urls')),
+    path('payments/',include('payments.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
