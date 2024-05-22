@@ -39,6 +39,13 @@ INSTALLED_APPS = [
     'knox',
     'rangefilter',
     'ckeditor',
+    'rest_framework.authtoken',
+    'dj_rest_auth',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 
 ] + PROJECT_APPS + [    # Config
     'beyondTax.apps.BoilerPlateConfig',
@@ -58,6 +65,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
+    'django_otp.middleware.OTPMiddleware',
 ]
 
 ROOT_URLCONF = 'beyondTax.urls'
@@ -152,3 +161,40 @@ TIME_INPUT_FORMATS = base_settings.BASE_TIME_INPUT_FORMATS
 X_FRAME_OPTIONS = "SAMEORIGIN"
 
 CKEDITOR_UPLOAD_PATH = "uploads/"
+
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
+SITE_ID = 1
+
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'offline',
+        },
+        'OAUTH_PKCE_ENABLED': True,
+    }
+}
+
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = '315840010372-1blu3bfvpru7rrcc367plh6ibt0gcvct.apps.googleusercontent.com'
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = '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'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_HOST_USER = 'sai28061999@gmail.com'
+# EMAIL_HOST_PASSWORD = 'Saibhargav@143'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# DEFAULT_FROM_EMAIL = 'sai28061999@gmail.com'

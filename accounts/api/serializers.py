@@ -1,32 +1,41 @@
 from django.contrib.auth import get_user_model, authenticate
-from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
-from rest_framework import serializers, request, status
+from rest_framework import serializers
 from django.contrib.auth.models import User
-from rest_framework.response import Response
-
 from accounts.models import User, WorkOrder, ServicePages, WorkOrderDocument, WorkOrderDownloadDocument, \
     WorkorderPayment, UpcomingDueDates
 
+User = get_user_model()
+
 
 class LoginSerializer(serializers.Serializer):
-    mobile_number = serializers.CharField(required=True)
-    password = serializers.CharField(max_length=128,required=True)
+    email_or_mobile = serializers.CharField(required=False)
+    password = serializers.CharField(max_length=128, required=True)
+    token = serializers.CharField(required=False)
 
     def validate(self, attrs):
-        mobile_number = attrs.get('mobile_number')
+        email_or_mobile = attrs.get('email_or_mobile')
         password = attrs.get('password')
-        try:
-            User.objects.get(mobile_number=mobile_number)
-        except ObjectDoesNotExist:
-            raise serializers.ValidationError("User does not exist.")
-        user = authenticate(username=mobile_number, password=password)
-        if user:
-            attrs['user'] = user
-            return attrs
+        token = attrs.get('token')
+        if token:
+            user = authenticate(request=self.context.get('request'), token=token)
+            if not user:
+                raise serializers.ValidationError("Invalid or expired token")
         else:
-            raise serializers.ValidationError('wrong credentials.')
+            if not email_or_mobile or not password:
+                raise serializers.ValidationError("Email or mobile and password are required for login.")
+            try:
+                if '@' in email_or_mobile:
+                    user = User.objects.get(email=email_or_mobile)
+                else:
+                    user = User.objects.get(mobile_number=email_or_mobile)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User does not exist.")
+            user = authenticate(username=email_or_mobile, password=password)
+            if not user:
+                raise serializers.ValidationError("Invalid credetials.")
+        attrs['user'] = user
+        return attrs
 
 
 class RegistrationSerializer(serializers.Serializer):
@@ -34,37 +43,65 @@ class RegistrationSerializer(serializers.Serializer):
         regex=r'^[1-9][0-9]{9}$',
         message="Please enter a valid mobile number format."
     )
-    mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10, required=True)
-    full_name = serializers.CharField(required=True)
-    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'], required=True)
+    client_type = serializers.ChoiceField(choices=User.CLIENT_TYPE_CHOICES, required=True)
+    mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10, required=False)
+    full_name = serializers.CharField(required=False)
+    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'], required=False)
     password = serializers.CharField(max_length=128, required=True)
     state = serializers.ChoiceField(choices=User.STATES_CHOICES, required=True)
-    email = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=False)
+
+    business_name = serializers.CharField(required=False)
+    business_contact_person = serializers.CharField(required=False)
+    business_mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10,
+                                                   required=False)
+    business_email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate(self, attrs):
+        client_type = attrs.get('client_type')
         mobile_number = attrs.get('mobile_number')
-        if not mobile_number:
-            raise serializers.ValidationError("Mobile Number is required field.")
-        full_name = attrs.get('full_name')
         email = attrs.get('email')
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError("This email is already used.")
         if User.objects.filter(mobile_number=mobile_number).exists():
             raise serializers.ValidationError("This mobile number already exists.")
-        name_parts = full_name.split(' ', 1)
-        attrs['first_name'] = name_parts[0]
-        attrs['last_name'] = name_parts[1] if len(name_parts) > 1 else ''
+        if client_type == User.Individual:
+            if not attrs.get('full_name'):
+                raise serializers.ValidationError("Full name is required for individual clients.")
+            if User.objects.filter(email=attrs.get('email')).exists():
+                raise serializers.ValidationError("This email is already used.")
+        else:
+            if not attrs.get('business_name'):
+                raise serializers.ValidationError("Business name is required for non-individual clients.")
+            if not attrs.get('business_contact_person'):
+                raise serializers.ValidationError("Business contact person is required for non-individual clients.")
+            if not attrs.get('business_mobile_number'):
+                raise serializers.ValidationError("Business mobile number is required for non-individual clients.")
+            if not attrs.get('business_email'):
+                raise serializers.ValidationError("Business email is required for non-individual clients.")
+            if User.objects.filter(business_email=attrs.get('business_email')).exists():
+                raise serializers.ValidationError("This business email is already used.")
+
         return attrs
 
     def create(self, validated_data):
-        user = User(mobile_number=validated_data['mobile_number'],
-                    first_name=validated_data['first_name'],
-                    last_name=validated_data['last_name'],
-                    date_of_birth=validated_data['date_of_birth'],
-                    state=validated_data['state'],
-                    email=validated_data.get('email_id', ''),
-                    is_active=False
-                    )
+        client_type = validated_data.get('client_type')
+        user = User(
+            mobile_number=validated_data['mobile_number'],
+            date_of_birth=validated_data['date_of_birth'],
+            state=validated_data['state'],
+            email=validated_data.get('email', ''),
+            client_type=client_type,
+            is_active=False,
+        )
+        if client_type == User.Individual:
+            user.first_name, user.last_name = validated_data['full_name'].split(' ', 1)
+        else:
+            user.business_name = validated_data['business_name']
+            user.business_contact_person = validated_data['business_contact_person']
+            user.business_mobile_number = validated_data['business_mobile_number']
+            user.business_email = validated_data['business_email']
+            user.is_active = False
         user.set_password(validated_data['password'])
         user.save()
         return user
@@ -75,26 +112,44 @@ class UserProfileSerializer(serializers.Serializer):
         regex=r'^[1-9][0-9]{9}$',
         message="Please enter a valid mobile number format."
     )
+
     mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10)
     first_name = serializers.CharField(max_length=255, required=False)
     last_name = serializers.CharField(max_length=255, required=False)
-    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'])
-    state = serializers.ChoiceField(choices=User.STATES_CHOICES)
-    email = serializers.CharField(required=False, allow_blank=True)
-    password = serializers.CharField(required=False)
-    confirm_password = serializers.CharField(required=False)
-    client_type = serializers.ChoiceField(choices=User.CLIENT_TYPE_CHOICES)
-    industry_type = serializers.ChoiceField(choices=User.INDUSTRY_TYPE_CHOICES)
-    nature_of_business = serializers.ChoiceField(choices=User.NATURE_OF_BUSINESS_CHOICES)
+    date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'], required=False)
+    state = serializers.ChoiceField(choices=User.STATES_CHOICES, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    password = serializers.CharField(required=False, write_only=True)
+    confirm_password = serializers.CharField(required=False, write_only=True)
+    client_type = serializers.ChoiceField(choices=User.CLIENT_TYPE_CHOICES, required=False)
+    industry_type = serializers.ChoiceField(choices=User.INDUSTRY_TYPE_CHOICES, required=False)
+    nature_of_business = serializers.ChoiceField(choices=User.NATURE_OF_BUSINESS_CHOICES, required=False)
     contact_person = serializers.CharField(max_length=255, required=False)
     job_title = serializers.CharField(max_length=255, required=False)
-    contact_person_phone_number = serializers.CharField(max_length=10, required=False)
-    contact_mail = serializers.CharField(max_length=255)
+    contact_person_phone_number = serializers.CharField(validators=[mobile_regex], max_length=10, required=False)
+    contact_email = serializers.EmailField(required=False, allow_blank=True)
     profile_picture = serializers.ImageField(required=False, allow_null=True, allow_empty_file=True)
+    business_name = serializers.CharField(max_length=255, required=False)
+    date_of_formation = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'], required=False)
+    business_mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, required=False)
+    business_email = serializers.EmailField(required=False, allow_blank=True)
+    number_of_employees = serializers.ChoiceField(choices=User.NUMBER_OF_EMPLOYEES_CHOICES, required=False)
+    annual_revenue = serializers.DecimalField(max_digits=30, decimal_places=2, required=False, allow_null=True)
 
     def validate(self, data):
-        if data["password"] != data["confirm_password"]:
+        if data.get('password') != data.get('confirm_password'):
             raise serializers.ValidationError("Passwords do not match")
+        client_type = data.get('client_type', self.instance.client_type if self.instance else None)
+        if client_type and client_type != User.Individual:
+            required_business_fields = [
+                'business_name', 'industry_type', 'date_of_formation',
+                'business_mobile_number', 'business_email',
+                'number_of_employees', 'annual_revenue'
+            ]
+            for field in required_business_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError(
+                        {field: f"{field.replace('_', ' ').capitalize()} is required for non-individual clients."})
         return data
 
     def to_representation(self, instance):
@@ -104,15 +159,14 @@ class UserProfileSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         if 'password' in validated_data:
-            instance.password = make_password(validated_data['password'])
+            instance.set_password(validated_data['password'])
+
         instance.mobile_number = validated_data.get('mobile_number', instance.mobile_number)
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)
-        if 'date_of_birth' in validated_data:
-            instance.date_of_birth = validated_data['date_of_birth']
+        instance.date_of_birth = validated_data.get('date_of_birth', instance.date_of_birth)
         instance.state = validated_data.get('state', instance.state)
-        if 'email' in validated_data:
-            instance.email = validated_data['email']
+        instance.email = validated_data.get('email', instance.email)
         instance.client_type = validated_data.get('client_type', instance.client_type)
         instance.industry_type = validated_data.get('industry_type', instance.industry_type)
         instance.nature_of_business = validated_data.get('nature_of_business', instance.nature_of_business)
@@ -121,7 +175,18 @@ class UserProfileSerializer(serializers.Serializer):
         instance.contact_person_phone_number = validated_data.get('contact_person_phone_number',
                                                                   instance.contact_person_phone_number)
         instance.contact_email = validated_data.get('contact_email', instance.contact_email)
-        instance.profile_picture = validated_data.get('profile_picture',instance.profile_picture)
+        instance.profile_picture = validated_data.get('profile_picture', instance.profile_picture)
+
+        if instance.client_type != User.Individual:
+            instance.business_name = validated_data.get('business_name', instance.business_name)
+            instance.business_type = validated_data.get('industry_type', instance.industry_type)
+            instance.date_of_formation = validated_data.get('date_of_formation', instance.date_of_formation)
+            instance.business_mobile_number = validated_data.get('business_mobile_number',
+                                                                 instance.business_mobile_number)
+            instance.business_email = validated_data.get('business_email', instance.business_email)
+            instance.number_of_employees = validated_data.get('number_of_employees', instance.number_of_employees)
+            instance.annual_revenue = validated_data.get('annual_revenue', instance.annual_revenue)
+
         instance.save()
         return instance
 
@@ -234,6 +299,11 @@ class UserBasicDetailsSerializer(serializers.Serializer):
     email = serializers.EmailField()
     profile_picture = serializers.ImageField()
     profile_title = serializers.SerializerMethodField()
+    client_type = serializers.ChoiceField(choices=User.CLIENT_TYPE_CHOICES)
+    business_name = serializers.CharField()
+    date_of_formation = serializers.DateField()
+    business_mobile_number = serializers.CharField()
+    business_email = serializers.EmailField()
 
     def get_full_name(self, obj):
         first_name = obj.first_name or ""
@@ -285,6 +355,7 @@ class WorkorderPaymentSerializer(serializers.ModelSerializer):
 
 
 class UpcomingDueDateSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = UpcomingDueDates
-        fields = ['data']
+        fields = ['date', 'compliance_activity', 'department', 'penalty_fine_interest']

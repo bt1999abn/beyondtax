@@ -7,6 +7,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from accounts import constants as accounts_constants
 from shared import abstract_models
+from django.utils.translation import gettext_lazy as _
 
 
 class UserManager(BaseUserManager):
@@ -77,34 +78,46 @@ class User(abstract_models.BaseModel, AbstractUser):
          ('Lakshadweep', 'Lakshadweep'),
          ('Puducherry', 'Puducherry'),
      ]
-    Individual, Proprietorship, Firm, LLP, Company, Trust = 1, 2, 3, 4, 5, 6
+    Individual, Proprietorship, HUF, Firm, LLP, PrivateLimitedCompany, PublicLimitedCompany, Trust = 1, 2, 3, 4, 5, 6, 7, 8
     CLIENT_TYPE_CHOICES = (
         (Individual, "Individual"),
         (Proprietorship, "Proprietorship"),
+        (HUF, "HUF"),
         (Firm, "Firm"),
         (LLP, "LLP"),
-        (Company, "Company"),
+        (PrivateLimitedCompany, "Private Limited Company"),
+        (PublicLimitedCompany, "Public Limited Company"),
         (Trust, "Trust"),
     )
     INDUSTRY_TYPE_CHOICES = [
-        ("Technology and IT", "Technology and IT"),
-        ("Healthcare and pharmaceuticals", "Healthcare and pharmaceuticals"),
-        ("Finance and banking", "Finance and banking"),
-        ("Manufacturing and production", "Manufacturing and production"),
-        ("Retail and e-commerce", "Retail and e-commerce"),
-        ("Energy and utilities", "Energy and utilities"),
-        ("Transportation and logistics", "Transportation and logistics"),
-        ("Media and entertainment", "Media and entertainment"),
-        ("Food and beverage", "Food and beverage"),
-        ("Hospitality and tourism", "Hospitality and tourism"),
+        ("Consultancy", "Consultancy"),
+        ("Technology", "Technology"),
+        ("Construction", "Construction"),
+        ("Clothing", "Clothing"),
+        ("Agriculture", "Agriculture"),
+        ("Salaried", "Salaried"),
+        ("Real Estate", "Real Estate"),
+        ("Food & beverage", "Food & beverage"),
+        ("Consulting", "Consulting"),
+        ("Rental", "Rental"),
+        ("Sports", "Sports"),
+        ("Decors", "Decors"),
+        ("Retail", "Retail"),
+        ("Healthcare", "Healthcare"),
     ]
     NATURE_OF_BUSINESS_CHOICES = [
         ('Service', 'Service'),
         ('Manufacturing', 'Manufacturing'),
-        ('Trading', 'Trading'),
+        ('Retailer', 'Retailer'),
+        ('Wholesaler', 'Wholesaler'),
+    ]
+    NUMBER_OF_EMPLOYEES_CHOICES = [
+        ('Upto 5 Employees', 'Upto 5 Employees'),
+        ('Upto 25 Employees', 'Upto 25 Employees'),
+        ('Above 25 Employees', 'Above 25 Employees'),
     ]
 
-    username = None
+    username = models.CharField(max_length=128, blank=False)
     # TODO: Should we write Transgender in this or not.
     password = models.CharField(max_length=128, blank=True)
 
@@ -121,7 +134,7 @@ class User(abstract_models.BaseModel, AbstractUser):
     gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
     state = models.CharField(choices=STATES_CHOICES, null=True, blank=True)
     is_active = models.BooleanField(default=False)
-    email = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(_('email address'), unique=True)
     client_type = models.IntegerField(choices=CLIENT_TYPE_CHOICES, null=True, blank=True, default=None)
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     industry_type = models.CharField(choices=INDUSTRY_TYPE_CHOICES, null=True, blank=True, default="PLEASE SELECT INDUSTRY TYPE")
@@ -130,8 +143,14 @@ class User(abstract_models.BaseModel, AbstractUser):
     job_title = models.CharField(max_length=255, blank=True)
     contact_person_phone_number = models.CharField(max_length=10, blank=True)
     contact_email = models.CharField(max_length=255, blank=True)
+    date_of_formation = models.DateField(null=True, blank=True)
+    annual_revenue = models.DecimalField(max_digits=30, decimal_places=2, default=Decimal('0.00'))
+    business_name = models.CharField(max_length=255, blank=True)
+    number_of_employees = models.CharField(choices=NUMBER_OF_EMPLOYEES_CHOICES, max_length=50, null=True, blank=True)
+    business_mobile_number = models.CharField(max_length=10, blank=True)
+    business_email = models.CharField(max_length=255, blank=True)
     USERNAME_FIELD = 'mobile_number'
-    REQUIRED_FIELDS = ['first_name', 'last_name', 'state', 'password']
+    REQUIRED_FIELDS = ['first_name', 'last_name', 'state', 'password','email']
 
     objects = UserManager()
 
@@ -144,9 +163,12 @@ class User(abstract_models.BaseModel, AbstractUser):
         return f'{first_name} {last_name}'.strip()
 
     def get_profile_title(self):
-        if self.first_name and self.last_name:
-            return f"{self.first_name[0].upper()}{self.last_name[0].upper()}"
-        return None
+        if self.client_type == self.Individual:
+            if self.first_name and self.last_name:
+                return f"{self.first_name[0].upper()}{self.last_name[0].upper()}"
+            return None
+        else:
+            return self.business_name
 
     def full_name(self):
         return self.get_full_name()
@@ -208,7 +230,7 @@ class ServicePages(abstract_models.BaseModel):
     )
     service_title = models.CharField(max_length=255 , default='Default Title')
     service_description = models.TextField(default='Default description')
-    certificate_price = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
+    certificate_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 
     registration_title = models.CharField(max_length=255 , default='Default Title')
     what_is = models.JSONField(default=dict)
@@ -306,7 +328,21 @@ class WorkorderPayment(abstract_models.BaseModel):
 
 
 class UpcomingDueDates(abstract_models.BaseModel):
-    data = models.JSONField(default=dict)
+    BusinessEssentials, TaxRelated, EntityFormation, IncomeTax, GST, Accounting, CompanyCompliance, TDS = 1, 2, 3, 4, 5, 6, 7, 8
+    DEPARTMENT_CHOICES = (
+        (BusinessEssentials, "Business Essentials"),
+        (TaxRelated, "Tax Related"),
+        (EntityFormation, "Entity Formation"),
+        (IncomeTax, "Income Tax"),
+        (GST, "GST"),
+        (Accounting, "Accounting"),
+        (CompanyCompliance, "Company Compliance"),
+        (TDS, "TDS"),
+    )
+    date = models.DateField( null=True, blank=True)
+    compliance_activity = models.CharField(max_length=255, null=True, blank=True)
+    department = models.IntegerField(choices=DEPARTMENT_CHOICES, null=True, blank=True)
+    penalty_fine_interest = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return f"UpcomingDueDates ID: {self.id}"
