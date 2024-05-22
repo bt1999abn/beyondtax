@@ -3,11 +3,12 @@ from accounts.api import views as accounts_api_views
 from knox.views import LogoutView, LogoutAllView
 from . import views
 from .views import WorkOrderDocumentUploadAPI, WorkorderPaymentRetriveApi, UpcomingDueDatesApi, \
-    WorkOrderDocumentUploadByBeyondtaxAPI
+    WorkOrderDocumentUploadByBeyondtaxAPI, GoogleLogin
 
 urlpatterns =[
 
     path('login/', accounts_api_views.LoginAPIView.as_view(), name='send_otp'),
+    path('dj-rest-auth/google/', GoogleLogin.as_view(), name='google_login'),
     path('send_otp/', accounts_api_views.sendOtpApi.as_view(), name='send_otp'),
     path('registration/', accounts_api_views.RegistrationApiView.as_view(), name='registering_user'),
     path('get-profile/', accounts_api_views.ProfileApiView.as_view(), name='get-profile'),
@@ -25,5 +26,5 @@ urlpatterns =[
     path('workorder-download-document/<int:work_order_id>/', views.WorkOrderDownloadDocumentApi.as_view(), name='workorder-download-document'),
     path('workorder-download-document-list/', views.WorkOrderDownloadDocumentListApi.as_view(), name='workorder-download-document-list'),
     path('workorder-payment/<int:work_order_id>/', WorkorderPaymentRetriveApi.as_view(), name='workorder-payment'),
-    path('upcoming-due_dates/<int:pk>/', UpcomingDueDatesApi.as_view(), name='upcoming-due_dates')
+    path('upcoming-due_dates/', UpcomingDueDatesApi.as_view(), name='upcoming-due_dates')
 ]

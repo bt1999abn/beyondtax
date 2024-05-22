@@ -66,8 +66,9 @@ class UserAdmin(BaseUserAdmin):
         (None, {'fields': ('email', 'password', 'mobile_number')}),
         ('Personal info', {
             'fields': ('first_name', 'last_name', 'date_of_birth', 'is_active', 'is_staff', 'is_superuser','client_type',
-                       'industry_type', 'nature_of_business', 'contact_person', 'job_title', 'contact_person_phone_number',
-                       'contact_email')
+                       'industry_type', 'nature_of_business', 'business_name', 'business_mobile_number', 'business_email',
+                       'contact_person', 'job_title', 'contact_person_phone_number', 'contact_email', 'date_of_formation',
+                       'annual_revenue', 'number_of_employees')
         }),
         ('Permissions', {'fields': ('user_permissions', "groups")}),
     )
@@ -113,9 +114,9 @@ class ProductProxyAdmin(admin.ModelAdmin):
 
 
 class UpcomingDueDateAdmin(admin.ModelAdmin):
-    list_display = ['id']
-    search_fields = ['data']
-    ordering = ['id']
+    list_display = ('date', 'compliance_activity', 'department', 'penalty_fine_interest')
+    list_filter = ('department',)
+    search_fields = ('compliance_activity', 'department')
 
 
 # Now register the new UserAdmin...

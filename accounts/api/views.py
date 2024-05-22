@@ -20,6 +20,9 @@ from accounts.models import OtpRecord, WorkOrder, WorkOrderDocument, WorkOrderDo
     UpcomingDueDates
 from accounts.services import SendMobileOtpService
 from shared.rest.pagination import CustomPagination
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from dj_rest_auth.registration.views import SocialLoginView
 
 
 class sendOtpApi(APIView):
@@ -50,10 +53,15 @@ class LoginAPIView(knox_views.LoginView):
             user = serializer.validated_data['user']
             login(request, user)
             response = super().post(request, format=None)
+            return Response(response.data, status=status.HTTP_200_OK)
         else:
             return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(response.data, status=status.HTTP_200_OK)
+
+class GoogleLogin(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
+    callback_url = "http://localhost:3000/dashboard"
+    client_class = OAuth2Client
 
 
 class RegistrationApiView(APIView):
@@ -122,9 +130,7 @@ class UpdateProfileApi(APIView):
         if serializer.is_valid():
             profile_picture = request.FILES.get('profile_picture')
             if profile_picture:
-                # Validate if it's an image
                 try:
-                    # Attempt to get image dimensions
                     width, height = get_image_dimensions(profile_picture)
                     if not width or not height:
                         return Response({"profile_picture": ["Invalid image, could not get dimensions."]},
@@ -257,9 +263,9 @@ class WorkOrderStatusSummaryApi(APIView):
     def get(self,request,*args,**kwargs):
         user = request.user
         user_workorders = WorkOrder.objects.filter(user=user)
-        inprocess_count = WorkOrder.objects.filter(status=1).count()
-        download_count = WorkOrder.objects.filter(status=2).count()
-        total_amount_paid = WorkOrder.objects.aggregate(Sum('amount_paid'))
+        inprocess_count = user_workorders.filter(status=1).count()
+        download_count = user_workorders.filter(status=2).count()
+        total_amount_paid = user_workorders.aggregate(Sum('amount_paid'))
         data = {
             "inprocess_count": inprocess_count,
             "download_count": download_count,
@@ -319,6 +325,6 @@ class WorkorderPaymentRetriveApi(APIView):
         return Response(serializer.data)
 
 
-class UpcomingDueDatesApi(generics.RetrieveAPIView):
+class UpcomingDueDatesApi(generics.ListAPIView):
     queryset = UpcomingDueDates.objects.all()
     serializer_class = UpcomingDueDateSerializer
