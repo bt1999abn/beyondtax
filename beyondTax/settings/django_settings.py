@@ -65,8 +65,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'allauth.account.middleware.AccountMiddleware',
-    'django_otp.middleware.OTPMiddleware',
 ]
 
 ROOT_URLCONF = 'beyondTax.urls'
