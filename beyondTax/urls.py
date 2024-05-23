@@ -32,10 +32,8 @@ urlpatterns = [
     path(r'jet/', include('shared.libs.external.jet.urls', 'jet')),  # Django JET URLS
     path(r'jet/dashboard/', include('shared.libs.external.jet.dashboard.urls', 'jet-dashboard')),
     # Django JET dashboard URLS
-    path('accounts-apis/',include('accounts.urls')),
-    path('', TemplateView.as_view(template_name='home.html'),name='home'),
-    path('login/', TemplateView.as_view(template_name='login.html'),name='login'),
-    path('accounts/', include('allauth.urls')),
+    path('accounts/',include('accounts.urls')),
+    path('accounts-allauth/', include('allauth.urls')),
     path('beyondTaxServices/', include('beyondTaxServices.urls')),
     path('ckeditor/', include('ckeditor_uploader.urls')),
     path('blogs/', include('blogs.urls')),
