@@ -95,7 +95,10 @@ class RegistrationSerializer(serializers.Serializer):
             is_active=False,
         )
         if client_type == User.Individual:
-            user.first_name, user.last_name = validated_data['full_name'].split(' ', 1)
+            full_name = validated_data['full_name']
+            name_parts = full_name.split(' ', 1)
+            user.first_name = name_parts[0]
+            user.last_name = name_parts[1] if len(name_parts) > 1 else ''
         else:
             user.business_name = validated_data['business_name']
             user.business_contact_person = validated_data['business_contact_person']
