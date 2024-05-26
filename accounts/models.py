@@ -130,7 +130,7 @@ class User(abstract_models.BaseModel, AbstractUser):
         regex=r'^([1-9][0-9]{9})$', message=accounts_constants.PHONE_NUMBER_LIMIT_MESSAGE
     )
     # Validators should be a list
-    mobile_number = models.CharField(validators=[mobile_regex], max_length=10, blank=True)
+    mobile_number = models.CharField(validators=[mobile_regex], max_length=10, blank=True, unique=True)
     gender = models.PositiveSmallIntegerField(choices=GENDER_CHOICES, null=True, blank=True)
     state = models.CharField(choices=STATES_CHOICES, null=True, blank=True)
     is_active = models.BooleanField(default=False)
@@ -155,7 +155,7 @@ class User(abstract_models.BaseModel, AbstractUser):
     objects = UserManager()
 
     def __str__(self):
-        return self.email
+        return self.mobile_number
 
     def get_full_name(self):
         first_name = " ".join(word.capitalize() for word in self.first_name.split()) if self.first_name else ''

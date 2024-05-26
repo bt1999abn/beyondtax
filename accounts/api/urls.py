@@ -8,7 +8,7 @@ from .views import WorkOrderDocumentUploadAPI, WorkorderPaymentRetriveApi, Upcom
 urlpatterns =[
 
     path('login/', accounts_api_views.LoginAPIView.as_view(), name='send_otp'),
-    path('dj-rest-auth/google/', GoogleLogin.as_view(), name='google_login'),
+    path('google/login/callback/', GoogleLogin.as_view(), name='google_callback'),
     path('send_otp/', accounts_api_views.sendOtpApi.as_view(), name='send_otp'),
     path('registration/', accounts_api_views.RegistrationApiView.as_view(), name='registering_user'),
     path('get-profile/', accounts_api_views.ProfileApiView.as_view(), name='get-profile'),

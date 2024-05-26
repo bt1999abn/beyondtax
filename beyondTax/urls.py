@@ -18,12 +18,14 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.views.generic import TemplateView
 
+from accounts.api.views import GoogleLogin
 from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('dj-rest-auth/', include('dj_rest_auth.urls')),
+    path('dj-rest-auth/registration/', include('dj_rest_auth.registration.urls')),
     path('service-dummy-api/', views.ServiceDummyApiView.as_view(), name='service-dummy-api'),
     path('mobilenumber-dummy-api/', views.MobileNumberDummyApi.as_view(), name='mobilenumber-dummy-api'),
     path('verifyotp-dummy-api/', views.VerifyOtpDummyApi.as_view(), name='verifyotp-dummy-api'),
