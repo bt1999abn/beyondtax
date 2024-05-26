@@ -181,18 +181,11 @@ SOCIALACCOUNT_PROVIDERS = {
             'access_type': 'offline',
         },
         'OAUTH_PKCE_ENABLED': True,
+        'APP': {
+            'client_id': '315840010372-1blu3bfvpru7rrcc367plh6ibt0gcvct.apps.googleusercontent.com',
+            'secret': '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',
+            'key': ''
+        }
     }
 }
 
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
-
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = '315840010372-1blu3bfvpru7rrcc367plh6ibt0gcvct.apps.googleusercontent.com'
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = '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'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_HOST_USER = 'sai28061999@gmail.com'
-# EMAIL_HOST_PASSWORD = 'Saibhargav@143'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# DEFAULT_FROM_EMAIL = 'sai28061999@gmail.com'

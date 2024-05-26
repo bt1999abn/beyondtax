@@ -1,6 +1,10 @@
+from allauth.socialaccount.models import SocialApp, SocialToken, SocialLogin
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from dj_rest_auth.registration.views import SocialLoginView
 from django.contrib.auth import login, get_user_model
 from django.core.files.images import get_image_dimensions
 from django.db.models import Sum
+from knox.models import AuthToken
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.permissions import AllowAny
@@ -16,13 +20,10 @@ from accounts.api.serializers import RegistrationSerializer, UserProfileSerializ
     UpcomingDueDateSerializer, WorkOrderDocumentsUploadSerializer
 from rest_framework.generics import CreateAPIView, ListAPIView
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord, WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument, WorkorderPayment, \
+from accounts.models import OtpRecord, WorkOrder, WorkOrderDownloadDocument, WorkorderPayment, \
     UpcomingDueDates
 from accounts.services import SendMobileOtpService
 from shared.rest.pagination import CustomPagination
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialLoginView
 
 
 class sendOtpApi(APIView):
@@ -60,8 +61,27 @@ class LoginAPIView(knox_views.LoginView):
 
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
-    callback_url = "http://localhost:3000/dashboard"
-    client_class = OAuth2Client
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        code = request.query_params.get('code')
+        if not code:
+            return Response({'error': 'Code is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        social_app = SocialApp.objects.get(provider='google')
+        token = SocialToken(app=social_app, token=code)
+        login = SocialLogin(token=token)
+
+        try:
+            login.lookup()
+            login.save(request, connect=True)
+            user = login.account.user
+            user.is_active = True
+            user.save()
+            _, login_token = AuthToken.objects.create(user)
+            return Response({'token': login_token}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class RegistrationApiView(APIView):
