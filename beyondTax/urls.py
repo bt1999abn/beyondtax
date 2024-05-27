@@ -36,6 +36,7 @@ urlpatterns = [
     # Django JET dashboard URLS
     path('accounts/',include('accounts.urls')),
     path('accounts-allauth/', include('allauth.urls')),
+    path('accounts-allauth/google/login/callback/', GoogleLogin.as_view(), name='google_callback'),
     path('beyondTaxServices/', include('beyondTaxServices.urls')),
     path('ckeditor/', include('ckeditor_uploader.urls')),
     path('blogs/', include('blogs.urls')),

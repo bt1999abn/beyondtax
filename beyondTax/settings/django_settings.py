@@ -182,8 +182,8 @@ SOCIALACCOUNT_PROVIDERS = {
         },
         'OAUTH_PKCE_ENABLED': True,
         'APP': {
-            'client_id': '315840010372-1blu3bfvpru7rrcc367plh6ibt0gcvct.apps.googleusercontent.com',
-            'secret': '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',
+            'client_id': '617719846999-tl7ep6u0j6356pf1g38t3nvrtrd4v1vg.apps.googleusercontent.com',
+            'secret': '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',
             'key': ''
         }
     }
