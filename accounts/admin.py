@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
-from accounts.models import WorkOrder, WorkOrderDocument, WorkOrderDownloadDocument, WorkorderPayment, UpcomingDueDates
+from accounts.models import UpcomingDueDates
 from accounts.proxy_models import ProductProxy
 from payments.models import Payment
 
@@ -86,27 +86,6 @@ class UserAdmin(BaseUserAdmin):
     filter_horizontal = ("user_permissions",)
 
 
-class WorkOrderDocumentsInline(admin.TabularInline):
-    model = WorkOrderDocument
-    extra = 1
-
-
-class WorkOrderDownloadDocumentInLine(admin.TabularInline):
-    model = WorkOrderDownloadDocument
-    extra = 1
-
-
-class WorkOrderPaymentInline(admin.TabularInline):
-    model = Payment
-    extra = 1
-
-
-class WorkOrderAdmin(admin.ModelAdmin):
-    inlines = [WorkOrderDocumentsInline, WorkOrderDownloadDocumentInLine, WorkOrderPaymentInline,]
-    list_display = ('service_name', 'amount_paid', 'status', 'user')
-    search_fields = ('service_name', 'user__username')
-
-
 class ProductProxyAdmin(admin.ModelAdmin):
 
     list_display = ('product_name', 'amount', 'discount', 'government_fee', 'due_date', 'due_duration')
@@ -121,7 +100,6 @@ class UpcomingDueDateAdmin(admin.ModelAdmin):
 
 # Now register the new UserAdmin...
 admin.site.register(accounts_models.User, UserAdmin)
-admin.site.register(WorkOrder, WorkOrderAdmin)
 admin.site.register(ProductProxy, ProductProxyAdmin)
 admin.site.register(UpcomingDueDates, UpcomingDueDateAdmin)
 # # ... and, since we're not using Django's built-in permissions,

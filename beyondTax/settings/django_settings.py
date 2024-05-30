@@ -1,3 +1,4 @@
+import logging
 import os
 
 from beyondTax.settings.base import BASE_DIR, env
@@ -16,6 +17,8 @@ PROJECT_APPS = [
     'beyondTaxServices',
     'blogs',
     'payments',
+    'services.incomeTax',
+    'workOrder',
 ]
 
 # Application definition
@@ -171,6 +174,11 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 
+BASE_APP_URL = "http://localhost:3000"
+BASE_API_URL = "http://localhost:8000"
+GOOGLE_OAUTH2_CLIENT_ID = "617719846999-tl7ep6u0j6356pf1g38t3nvrtrd4v1vg.apps.googleusercontent.com"
+GOOGLE_OAUTH2_CLIENT_SECRET = "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"
+
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': [
@@ -178,13 +186,7 @@ SOCIALACCOUNT_PROVIDERS = {
             'email',
         ],
         'AUTH_PARAMS': {
-            'access_type': 'offline',
-        },
-        'OAUTH_PKCE_ENABLED': True,
-        'APP': {
-            'client_id': '617719846999-tl7ep6u0j6356pf1g38t3nvrtrd4v1vg.apps.googleusercontent.com',
-            'secret': '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',
-            'key': ''
+            'access_type': 'online',
         }
     }
 }
