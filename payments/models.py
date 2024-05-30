@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.safestring import mark_safe
 
-from accounts.models import WorkOrder
+from workOrder.models import WorkOrder
 from shared import abstract_models
 
 

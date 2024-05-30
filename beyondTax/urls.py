@@ -19,13 +19,12 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 
-from accounts.api.views import GoogleLogin
+from accounts.api.views import GoogleLoginApi
 from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('dj-rest-auth/', include('dj_rest_auth.urls')),
-    path('dj-rest-auth/registration/', include('dj_rest_auth.registration.urls')),
+    path('auth/api/login/google/', GoogleLoginApi.as_view(), name='google_login'),
     path('service-dummy-api/', views.ServiceDummyApiView.as_view(), name='service-dummy-api'),
     path('mobilenumber-dummy-api/', views.MobileNumberDummyApi.as_view(), name='mobilenumber-dummy-api'),
     path('verifyotp-dummy-api/', views.VerifyOtpDummyApi.as_view(), name='verifyotp-dummy-api'),
@@ -35,9 +34,9 @@ urlpatterns = [
     path(r'jet/dashboard/', include('shared.libs.external.jet.dashboard.urls', 'jet-dashboard')),
     # Django JET dashboard URLS
     path('accounts/',include('accounts.urls')),
-    path('accounts-allauth/', include('allauth.urls')),
-    path('accounts-allauth/google/login/callback/', GoogleLogin.as_view(), name='google_callback'),
     path('beyondTaxServices/', include('beyondTaxServices.urls')),
+    path('workorder/', include('workOrder.urls')),
+    path('incomeTax/', include('services.incomeTax.urls')),
     path('ckeditor/', include('ckeditor_uploader.urls')),
     path('blogs/', include('blogs.urls')),
     path('payments/',include('payments.urls')),
