@@ -15,6 +15,7 @@ from accounts.api.serializers import RegistrationSerializer, UserProfileSerializ
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User
 from accounts.services import SendMobileOtpService, get_user_data
+from beyondTax import settings
 
 
 class sendOtpApi(APIView):
@@ -50,9 +51,10 @@ class LoginAPIView(knox_views.LoginView):
             return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class GoogleLoginApi(APIView):
+class GoogleLoginApi(knox_views.LoginView):
+    permission_classes = (AllowAny,)
 
-    def get(self,request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         auth_serializer = AuthSerializer(data=request.GET)
         auth_serializer.is_valid(raise_exception=True)
         validate_data = auth_serializer.validated_data
@@ -60,7 +62,9 @@ class GoogleLoginApi(APIView):
         user = User.objects.get(email=user_data['email'])
         user.backend = 'django.contrib.auth.backends.ModelBackend'
         login(request, user)
-        return redirect(beyondTax.settings.BASE_APP_URL)
+        response = super().post(request, format=None)
+        FE_SIGNIN_SUCCESS_URL = settings.FE_GOOGLE_LOGIN_SUCCESS.format(token=response.data["token"])
+        return redirect(FE_SIGNIN_SUCCESS_URL)
 
 
 class RegistrationApiView(APIView):

@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import redirect
 from urllib.parse import urlencode
 import beyondTax
+from beyondTax import settings
 from .models import OtpRecord, User
 
 
@@ -51,7 +52,7 @@ class SendMobileOtpService:
 
 GOOGLE_ACCESS_TOKEN_OBTAIN_URL = 'https://oauth2.googleapis.com/token'
 GOOGLE_USER_INFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
-LOGIN_URL = f'{beyondTax.settings.BASE_APP_URL}/internal/login'
+LOGIN_URL = f'{settings.FRONTEND_HOST}/internal/login'
 
 
 def google_get_access_token(code: str, redirect_uri: str) -> str:
@@ -85,7 +86,7 @@ def google_get_user_info(access_token: str) -> Dict[str, Any]:
 
 
 def get_user_data(validated_data):
-    domain = beyondTax.settings.BASE_API_URL
+    domain = settings.HOST
     redirect_uri = f'{domain}/auth/api/login/google/'
 
     code = validated_data.get('code')
