@@ -86,7 +86,7 @@ def google_get_user_info(access_token: str) -> Dict[str, Any]:
 
 
 def get_user_data(validated_data):
-    domain = settings.HOST
+    domain = settings.BACKEND_BASE_URL
     redirect_uri = f'{domain}/auth/api/login/google/'
 
     code = validated_data.get('code')

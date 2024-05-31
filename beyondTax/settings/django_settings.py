@@ -9,6 +9,7 @@ SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
+IS_LIVE = env("IS_LIVE")
 
 ALLOWED_HOSTS = ["localhost", "stage-api.beyondtaxindia.com"]
 
