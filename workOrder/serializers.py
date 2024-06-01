@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from rest_framework import serializers
 
 from accounts.models import ServicePages
@@ -5,6 +6,7 @@ from workOrder.models import WorkOrderDocument, WorkOrder, WorkOrderDownloadDocu
 
 
 class WorkOrderSerializer(serializers.ModelSerializer):
+    summary = serializers.SerializerMethodField()
     user = serializers.ReadOnlyField(source='user.id')
     service_id = serializers.IntegerField(write_only=True)
     service_name = serializers.SerializerMethodField()
@@ -13,7 +15,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkOrder
         fields = '__all__'
-        read_only_fields = ('user', 'service', 'service_name')
+        read_only_fields = ('user', 'service', 'service_name', 'summary')
 
     def get_required_documents_list(self, obj):
         if obj.service:
@@ -35,6 +37,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         validated_data['service'] = self.context.get('service')
         validated_data['user'] = self.context['request'].user
         return WorkOrder.objects.create(**validated_data)
+
+    def get_summary(self, obj):
+        summary = self.context.get('summary')
+        if summary is None:
+            user_workorders = WorkOrder.objects.filter(user=obj.user)
+            summary ={
+                "inprocess_count": user_workorders.filter(status=3).count(),
+                "download_count": user_workorders.filter(status=5).count(),
+                "total_amount_paid": user_workorders.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0,
+            }
+            self.context['summary'] = summary
+            return summary
 
 
 class DocumentSerializer(serializers.ModelSerializer):
