@@ -189,10 +189,16 @@ class User(abstract_models.BaseModel, AbstractUser):
 
 
 class OtpRecord(abstract_models.BaseModel):
+    Email, Mobile = 1, 2
+    SOURCE_CHOICES =(
+        (Email, 'Email'),
+        (Mobile, 'Mobile'),
+    )
     mobile_number = models.CharField(max_length=15)
     otp = models.CharField(max_length=4)
     otp_session_id = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    source = models.IntegerField(choices=SOURCE_CHOICES, null=True, blank=True, default=None)
 
     def __str__(self):
         return self.mobile_number
