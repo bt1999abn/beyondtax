@@ -194,8 +194,9 @@ class OtpRecord(abstract_models.BaseModel):
         (Email, 'Email'),
         (Mobile, 'Mobile'),
     )
+    email = models.EmailField(max_length=255, blank=True)
     mobile_number = models.CharField(max_length=15)
-    otp = models.CharField(max_length=4)
+    otp = models.CharField(max_length=6)
     otp_session_id = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     source = models.IntegerField(choices=SOURCE_CHOICES, null=True, blank=True, default=None)
