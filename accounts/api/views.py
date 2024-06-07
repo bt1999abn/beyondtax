@@ -14,7 +14,7 @@ from accounts.api.serializers import RegistrationSerializer, UserProfileSerializ
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User
-from accounts.services import SendMobileOtpService, get_user_data
+from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, SendEmailService
 from beyondTax import settings
 
 
@@ -174,3 +174,47 @@ class UserBasicDetailsApi(APIView):
 class UpcomingDueDatesApi(generics.ListAPIView):
     queryset = UpcomingDueDates.objects.all()
     serializer_class = UpcomingDueDateSerializer
+
+
+class SendOtpView(APIView):
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email')
+        try:
+            user = User.objects.get(email=email)
+            otp_service = SendEmailOtpService()
+            otp_service.send_otp(user)
+            return Response({'status': 'success', 'message': 'OTP sent to your email'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'status': 'error', 'message': 'User with this email does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class VerifyOtpView(APIView):
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email')
+        otp = request.data.get('otp')
+        if not otp:
+            return Response({'status': 'error', 'message': 'OTP is a required field'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        otp_service = SendEmailOtpService()
+        if otp_service.verify_otp(email, otp):
+            return Response({'status': 'success', 'message': 'OTP verification successful'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'message': 'Invalid or expired OTP'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
+class SendEmailView(APIView):
+    def post(self, request, *args, **kwargs):
+        recipient_email = request.data.get('recipient_email')
+        subject = request.data.get('subject')
+        message = request.data.get('message')
+        recipient_name = request.data.get('recipient_name')
+
+        if not all([recipient_email, subject, message, recipient_name]):
+            return Response({'status': 'error', 'message': 'All fields are required'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        email_service = SendEmailService()
+        email_service.send_email(recipient_email, subject, message, recipient_name)
+
+        return Response({'status': 'success', 'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
