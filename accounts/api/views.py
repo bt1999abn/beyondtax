@@ -5,16 +5,16 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, serializers, generics
+from rest_framework import status, serializers, generics, parsers
 from django.utils import timezone
 from datetime import timedelta
 from knox import views as knox_views
-import beyondTax.settings
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, \
-    ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer
+    ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
+    BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord, UpcomingDueDates, User
-from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, SendEmailService
+from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails
+from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
 from beyondTax import settings
 
 
@@ -207,14 +207,65 @@ class SendEmailView(APIView):
     def post(self, request, *args, **kwargs):
         recipient_email = request.data.get('recipient_email')
         subject = request.data.get('subject')
-        message = request.data.get('message')
-        recipient_name = request.data.get('recipient_name')
+        template_path = 'email_templates/message_email.html'
 
-        if not all([recipient_email, subject, message, recipient_name]):
-            return Response({'status': 'error', 'message': 'All fields are required'},
+        context = {
+            'recipient_name': request.data.get('recipient_name', ''),
+            'message': 'you can login to your beyondtax profile with your new password',
+            'subject': 'password hasbeen successfully changed',
+        }
+        if not recipient_email:
+            return Response({'status': 'error', 'message': 'Recipient email is required'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        email_service = SendEmailService()
-        email_service.send_email(recipient_email, subject, message, recipient_name)
+        email_service = EmailService()
+        email_service.send_email(recipient_email,subject, template_path, context)
 
         return Response({'status': 'success', 'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
+
+
+class BusinessContactPersonAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.client_type == User.Individual:
+            return Response([])
+        else:
+            contact_persons = BusinessContactPersonDetails.objects.filter(user=user)
+            serializer = BusinessContactPersonSerializer(contact_persons, many=True)
+            return Response(serializer.data)
+
+    def post(self, request):
+        if request.user.client_type == User.Individual:
+            return Response({"detail": "Individuals cannot have contact persons"}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = UserBusinessContactPersonsSerializer(data=request.data)
+        if serializer.is_valid():
+            contact_persons_data = serializer.validated_data['contact_persons']
+            contact_persons = []
+            for contact_person_data in contact_persons_data:
+                contact_person = BusinessContactPersonDetails.objects.create(
+                    user=request.user,
+                    **contact_person_data
+                )
+                contact_persons.append(contact_person)
+            return Response(
+                {
+                    "message": "Contact persons created successfully",
+                    "contact_persons": BusinessContactPersonSerializer(contact_persons, many=True).data
+                },
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, pk):
+        try:
+            contact_person = BusinessContactPersonDetails.objects.get(pk=pk, user=request.user)
+        except BusinessContactPersonDetails.DoesNotExist:
+            return Response({"detail": "Contact person not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = BusinessContactPersonSerializer(contact_person, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

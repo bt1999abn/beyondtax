@@ -138,14 +138,14 @@ class SendEmailOtpService:
 
     def send_otp(self, user):
         otp = self.generate_otp()
-        otp_record = OtpRecord.objects.create(
+        OtpRecord.objects.create(
             email=user.email,
             mobile_number=user.mobile_number,
             otp=str(otp),
             otp_session_id=str(uuid.uuid4()),
             source=OtpRecord.Email,
         )
-        email_thread = threading.Thread(target=SendEmailOtpService.send_otp_email, args=(user.email, otp))
+        email_thread = threading.Thread(target=self.send_otp_email, args=(user, otp))
         email_thread.start()
 
     def verify_otp(self, email, otp):
@@ -159,17 +159,13 @@ class SendEmailOtpService:
         return False
 
 
-class SendEmailService:
+class EmailService:
 
-    def send_email(self, recipient_email, subject, message, recipient_name):
-        html_message = render_to_string('email_templates/message_email.html', {
-            'recipient_name': recipient_name,
-            'subject': subject,
-            'message': message
-        })
+    def send_email(self, recipient_email, subject,  template_path, context):
+        html_message = render_to_string(template_path, context)
         plain_message = strip_tags(html_message)
         email_from = settings.EMAIL_HOST_USER
         recipient_list = [recipient_email]
 
-        email_thread = threading.Thread(target=send_mail, args=(subject, plain_message, email_from, recipient_list), kwargs={'html_message': html_message})
+        email_thread = threading.Thread(target=send_mail, args=(subject, plain_message, email_from, recipient_list,), kwargs={'html_message': html_message})
         email_thread.start()
