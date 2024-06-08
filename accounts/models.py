@@ -286,4 +286,21 @@ class UpcomingDueDates(abstract_models.BaseModel):
         return f"UpcomingDueDates ID: {self.id}"
 
 
+class BusinessContactPersonDetails(abstract_models.BaseModel):
+    TIMING_CHOICES = [
+        ('9AM - 12PM', '9AM - 12PM'),
+        ('12PM - 5PM', '12PM - 5PM'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contact_persons')
+    name = models.CharField(max_length=255)
+    role = models.CharField(max_length=255)
+    preferred_timing = models.CharField(choices=TIMING_CHOICES, null=True, blank=True)
+    email = models.EmailField()
+    mobile_regex = RegexValidator(
+        regex=r'^([1-9][0-9]{9})$', message=accounts_constants.PHONE_NUMBER_LIMIT_MESSAGE
+    )
+    mobile_number = models.CharField(validators=[mobile_regex], max_length=10)
+
+
 

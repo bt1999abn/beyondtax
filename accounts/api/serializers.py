@@ -1,8 +1,9 @@
 from django.contrib.auth import get_user_model, authenticate
 from django.core.validators import RegexValidator
+from django.db.migrations import serializer
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from accounts.models import User, UpcomingDueDates
+from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails
 
 User = get_user_model()
 
@@ -247,3 +248,17 @@ class UpcomingDueDateSerializer(serializers.ModelSerializer):
     class Meta:
         model = UpcomingDueDates
         fields = ['date', 'compliance_activity', 'department', 'penalty_fine_interest']
+
+
+class BusinessContactPersonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessContactPersonDetails
+        fields = '__all__'
+
+
+class UserBusinessContactPersonsSerializer(serializers.ModelSerializer):
+    contact_persons = BusinessContactPersonSerializer(many=True)
+
+    class Meta:
+        model = User
+        fields = ['contact_persons']
