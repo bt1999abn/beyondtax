@@ -125,7 +125,7 @@ def get_user_data(validated_data):
 class SendEmailOtpService:
 
     def generate_otp(self):
-        return random.randint(100000, 999999)
+        return random.randint(1000, 9999)
 
     def send_otp_email(self, user, otp):
         subject = 'Your OTP for Password Reset'

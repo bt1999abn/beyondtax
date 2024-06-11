@@ -196,7 +196,7 @@ class OtpRecord(abstract_models.BaseModel):
     )
     email = models.EmailField(max_length=255, blank=True)
     mobile_number = models.CharField(max_length=15)
-    otp = models.CharField(max_length=6)
+    otp = models.CharField(max_length=4)
     otp_session_id = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     source = models.IntegerField(choices=SOURCE_CHOICES, null=True, blank=True, default=None)
@@ -267,7 +267,7 @@ class ServicePages(abstract_models.BaseModel):
 
 class UpcomingDueDates(abstract_models.BaseModel):
     BusinessEssentials, TaxRelated, EntityFormation, IncomeTax, GST, Accounting, CompanyCompliance, TDS = 1, 2, 3, 4, 5, 6, 7, 8
-    DEPARTMENT_CHOICES = (
+    SERVICE_TYPE_CHOICES = (
         (BusinessEssentials, "Business Essentials"),
         (TaxRelated, "Tax Related"),
         (EntityFormation, "Entity Formation"),
@@ -279,7 +279,7 @@ class UpcomingDueDates(abstract_models.BaseModel):
     )
     date = models.DateField( null=True, blank=True)
     compliance_activity = models.CharField(max_length=255, null=True, blank=True)
-    department = models.IntegerField(choices=DEPARTMENT_CHOICES, null=True, blank=True)
+    service_type = models.IntegerField(choices=SERVICE_TYPE_CHOICES, null=True, blank=True)
     penalty_fine_interest = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):

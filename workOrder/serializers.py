@@ -1,6 +1,5 @@
 from django.db.models import Sum
 from rest_framework import serializers
-
 from accounts.models import ServicePages
 from workOrder.models import WorkOrderDocument, WorkOrder, WorkOrderDownloadDocument, WorkorderPayment
 
