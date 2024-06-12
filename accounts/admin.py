@@ -93,9 +93,9 @@ class ProductProxyAdmin(admin.ModelAdmin):
 
 
 class UpcomingDueDateAdmin(admin.ModelAdmin):
-    list_display = ('date', 'compliance_activity', 'department', 'penalty_fine_interest')
-    list_filter = ('department',)
-    search_fields = ('compliance_activity', 'department')
+    list_display = ('date', 'compliance_activity', 'service_type', 'penalty_fine_interest')
+    list_filter = ('service_type',)
+    search_fields = ('compliance_activity', 'service_type')
 
 
 # Now register the new UserAdmin...

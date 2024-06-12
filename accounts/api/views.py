@@ -1,6 +1,7 @@
 from django.contrib.auth import login, get_user_model
 from django.core.files.images import get_image_dimensions
 from django.shortcuts import redirect
+from django_filters.rest_framework import filters, DjangoFilterBackend
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -11,7 +12,7 @@ from datetime import timedelta
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, \
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
-    BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer
+    BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails
 from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
@@ -174,9 +175,13 @@ class UserBasicDetailsApi(APIView):
 class UpcomingDueDatesApi(generics.ListAPIView):
     queryset = UpcomingDueDates.objects.all()
     serializer_class = UpcomingDueDateSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = UpcomingDueDatesFilter
 
 
-class SendOtpView(APIView):
+class SendEmailOtpApi(APIView):
+
+
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         try:
@@ -188,7 +193,7 @@ class SendOtpView(APIView):
             return Response({'status': 'error', 'message': 'User with this email does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
-class VerifyOtpView(APIView):
+class VerifyEmailOtpApi(APIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         otp = request.data.get('otp')
@@ -203,7 +208,7 @@ class VerifyOtpView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
 
-class SendEmailView(APIView):
+class SendEmailApi(APIView):
     def post(self, request, *args, **kwargs):
         recipient_email = request.data.get('recipient_email')
         subject = request.data.get('subject')
