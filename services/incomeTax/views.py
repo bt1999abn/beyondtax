@@ -2,8 +2,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails
-from services.incomeTax.serializers import IncomeTaxProfileSerializer, IncomeTaxBankDetailsSerializer
+from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxReturn
+from services.incomeTax.serializers import IncomeTaxProfileSerializer, IncomeTaxBankDetailsSerializer, \
+    IncomeTaxReturnSerializer
 
 
 class IncomeTaxProfileApi(APIView):
@@ -32,6 +33,23 @@ class IncomeTaxProfileApi(APIView):
 class IncomeTaxBankDetailsView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, income_tax_pk=None):
+        user = request.user
+        try:
+            income_tax_profile = IncomeTaxProfile.objects.get(user=user)
+        except IncomeTaxProfile.DoesNotExist:
+            return Response({'message': 'User does not have an Income Tax Profile'}, status=status.HTTP_404_NOT_FOUND)
+        if income_tax_pk:
+            try:
+                bank_details = IncomeTaxBankDetails.objects.filter(income_tax=income_tax_profile.pk, pk=income_tax_pk)
+            except ValueError:
+                return Response({'error': 'Invalid income tax profile ID'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            bank_details = IncomeTaxBankDetails.objects.filter(income_tax=income_tax_profile)
+
+        serializer = IncomeTaxBankDetailsSerializer(bank_details, many=True)
+        return Response(serializer.data)
+
     def post(self, request):
         serializer = IncomeTaxBankDetailsSerializer(data=request.data)
         if serializer.is_valid():
@@ -59,3 +77,13 @@ class IncomeTaxBankDetailsView(APIView):
 
         bank_details.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ListIncomeTaxReturnsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        income_tax_returns = IncomeTaxReturn.objects.filter(user=user)
+        serializer = IncomeTaxReturnSerializer(income_tax_returns, many=True)
+        return Response(serializer.data)

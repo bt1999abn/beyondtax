@@ -1,6 +1,7 @@
 from django.core.validators import RegexValidator
 from rest_framework import serializers
-from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxAddress
+from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxAddress, IncomeTaxReturnYears, \
+    IncomeTaxReturn
 
 
 class IncomeTaxAddressSerializer(serializers.ModelSerializer):
@@ -68,5 +69,20 @@ class IncomeTaxBankDetailsSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class IncomeTaxReturnYearSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncomeTaxReturnYears
+        fields = ('id', 'start_date', 'end_date', 'due_date', 'status')
+
+
+class IncomeTaxReturnSerializer(serializers.ModelSerializer):
+    income_tax_return_year = IncomeTaxReturnYearSerializer()
+
+    class Meta:
+        model = IncomeTaxReturn
+        fields = ('id', 'user', 'income_tax_return_year', 'status')
+
 
 
