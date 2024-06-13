@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
-from accounts.models import UpcomingDueDates
+from accounts.models import UpcomingDueDates, OtpRecord
 from accounts.proxy_models import ProductProxy
 from payments.models import Payment
 
@@ -98,10 +98,17 @@ class UpcomingDueDateAdmin(admin.ModelAdmin):
     search_fields = ('compliance_activity', 'service_type')
 
 
+class OtpRecordAdmin(admin.ModelAdmin):
+    list_display = ('email', 'mobile_number', 'otp', 'created_at', 'source')
+    list_filter = ('source',)
+    search_fields = ('source',)
+
+
 # Now register the new UserAdmin...
 admin.site.register(accounts_models.User, UserAdmin)
 admin.site.register(ProductProxy, ProductProxyAdmin)
 admin.site.register(UpcomingDueDates, UpcomingDueDateAdmin)
+admin.site.register(OtpRecord, OtpRecordAdmin)
 # # ... and, since we're not using Django's built-in permissions,
 # # unregister the Group model from admin_panel.
 # admin_panel.site.unregister(Group)

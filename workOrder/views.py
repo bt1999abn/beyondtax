@@ -36,7 +36,7 @@ class GetWorkOrderApi(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return WorkOrder.objects.filter(user=user)
+        return WorkOrder.objects.filter(user=user).order_by('-updated_at')
 
 
 class WorkOrderDocumentUploadAPI(APIView):

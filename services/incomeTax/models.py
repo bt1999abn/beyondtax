@@ -70,6 +70,27 @@ class IncomeTaxAddress(abstract_models.BaseModel):
     country = models.CharField(max_length=255, blank=True)
 
 
+class IncomeTaxReturnYears(abstract_models.BaseModel):
+    Open, Closed = 1, 2
+    STATUS_CHOICES = (
+        (Open, 'open'),
+        (Closed, 'closed'),
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+    due_date = models.DateField()
+    status = models.IntegerField(choices=STATUS_CHOICES, blank=True)
 
+
+class IncomeTaxReturn(abstract_models.BaseModel):
+    PartiallyFiled, Filed, NotFiled = 1, 2, 3
+    STATUS_CHOICES =(
+        (PartiallyFiled, 'Partially Filed'),
+        (Filed, 'Filed'),
+        (NotFiled, 'Not Filed'),
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='income_tax_returns')
+    income_tax_return_year = models.ForeignKey(IncomeTaxReturnYears, on_delete=models.CASCADE, related_name='income_tax_return_year')
+    status = models.IntegerField(choices=STATUS_CHOICES, blank=True)
 
 
