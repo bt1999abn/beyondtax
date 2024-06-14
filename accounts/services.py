@@ -138,21 +138,22 @@ class SendEmailOtpService:
 
     def send_otp(self, user):
         otp = self.generate_otp()
+        otp_session_id = str(uuid.uuid4())
         OtpRecord.objects.create(
             email=user.email,
             mobile_number=user.mobile_number,
             otp=str(otp),
-            otp_session_id=str(uuid.uuid4()),
+            otp_session_id=otp_session_id,
             source=OtpRecord.Email,
         )
         email_thread = threading.Thread(target=self.send_otp_email, args=(user, otp))
         email_thread.start()
+        return otp_session_id
 
-    def verify_otp(self, email, otp):
+    def verify_otp(self, otp_session_id, otp):
         try:
-            otp_record = OtpRecord.objects.get(email=email, otp=otp)
+            otp_record = OtpRecord.objects.get(otp_session_id=otp_session_id, otp=otp)
             if timezone.now() < otp_record.created_at + timedelta(minutes=10):
-                otp_record.delete()
                 return True
         except OtpRecord.DoesNotExist:
             return False

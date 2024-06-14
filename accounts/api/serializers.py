@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.hashers import check_password
 from django.core.validators import RegexValidator
 from django_filters import rest_framework as filters
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails
+from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord
 
 User = get_user_model()
 
@@ -270,3 +271,29 @@ class UserBusinessContactPersonsSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['contact_persons']
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    otp_session_id = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+    confirm_password = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs):
+        otp_session_id = attrs.get('otp_session_id')
+        password = attrs.get('password')
+        confirm_password = attrs.get('confirm_password')
+
+        if password != confirm_password:
+            raise serializers.ValidationError("Passwords do not match.")
+
+        try:
+            otp_record = OtpRecord.objects.get(otp_session_id=otp_session_id)
+            user = User.objects.get(email=otp_record.email)
+            if check_password(password, user.password):
+                raise serializers.ValidationError("New password cannot be the same as the old password.")
+        except OtpRecord.DoesNotExist:
+            raise serializers.ValidationError("Invalid OTP session ID.")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+        return attrs
