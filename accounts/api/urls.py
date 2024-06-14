@@ -2,7 +2,7 @@ from django.urls import path
 from accounts.api import views as accounts_api_views
 from knox.views import LogoutView, LogoutAllView
 from .views import UpcomingDueDatesApi, BusinessContactPersonAPIView, \
-    SendEmailOtpApi, VerifyEmailOtpApi, SendEmailApi
+    SendEmailOtpApi, VerifyEmailOtpApi, SendEmailApi, ResetPasswordApi
 
 urlpatterns =[
 
@@ -23,4 +23,5 @@ urlpatterns =[
     path('create-business-contact-person/',BusinessContactPersonAPIView.as_view(), name='create-business-contact-person'),
     path('list-business-contact-person/',BusinessContactPersonAPIView.as_view(), name='list-business-contact-person'),
     path('update-business-contact-person/<int:pk>/',BusinessContactPersonAPIView.as_view(), name='list-business-contact-person'),
+    path('reset-password/',ResetPasswordApi.as_view(), name='reset-password'),
 ]

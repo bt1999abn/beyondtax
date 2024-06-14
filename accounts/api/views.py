@@ -1,4 +1,5 @@
 from django.contrib.auth import login, get_user_model
+from django.contrib.auth.hashers import make_password
 from django.core.files.images import get_image_dimensions
 from django.shortcuts import redirect
 from django_filters.rest_framework import filters, DjangoFilterBackend
@@ -12,7 +13,8 @@ from datetime import timedelta
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, \
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
-    BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter
+    BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter, \
+    PasswordResetSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails
 from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
@@ -181,27 +183,26 @@ class UpcomingDueDatesApi(generics.ListAPIView):
 
 class SendEmailOtpApi(APIView):
 
-
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         try:
             user = User.objects.get(email=email)
             otp_service = SendEmailOtpService()
-            otp_service.send_otp(user)
-            return Response({'status': 'success', 'message': 'OTP sent to your email'}, status=status.HTTP_200_OK)
+            otp_session_id = otp_service.send_otp(user)
+            return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_session_id': otp_session_id}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'status': 'error', 'message': 'User with this email does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class VerifyEmailOtpApi(APIView):
     def post(self, request, *args, **kwargs):
-        email = request.data.get('email')
+        otp_session_id = request.data.get('otp_session_id')
         otp = request.data.get('otp')
         if not otp:
             return Response({'status': 'error', 'message': 'OTP is a required field'},
                             status=status.HTTP_400_BAD_REQUEST)
         otp_service = SendEmailOtpService()
-        if otp_service.verify_otp(email, otp):
+        if otp_service.verify_otp(otp_session_id, otp):
             return Response({'status': 'success', 'message': 'OTP verification successful'}, status=status.HTTP_200_OK)
         else:
             return Response({'status': 'error', 'message': 'Invalid or expired OTP'},
@@ -274,3 +275,28 @@ class BusinessContactPersonAPIView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResetPasswordApi(APIView):
+
+    def post(self, request, *args, **kwargs):
+        serializer = PasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+            otp_session_id = serializer.validated_data['otp_session_id']
+            password = serializer.validated_data['password']
+
+            try:
+                otp_record = OtpRecord.objects.get(otp_session_id=otp_session_id)
+                user = User.objects.get(email=otp_record.email)
+                user.password = make_password(password)
+                user.save()
+                otp_record.delete()
+                return Response({'status': 'success', 'message': 'Password reset successfully'},
+                                status=status.HTTP_200_OK)
+            except OtpRecord.DoesNotExist:
+                return Response({'status': 'error', 'message': 'Invalid OTP session ID'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            except User.DoesNotExist:
+                return Response({'status': 'error', 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
