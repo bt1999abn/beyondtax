@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxReturn
+from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxReturn, IncomeTaxReturnYears
 from services.incomeTax.serializers import IncomeTaxProfileSerializer, IncomeTaxBankDetailsSerializer, \
     IncomeTaxReturnSerializer
 
@@ -84,6 +84,14 @@ class ListIncomeTaxReturnsView(APIView):
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        income_tax_returns = IncomeTaxReturn.objects.filter(user=user)
+        income_tax_returns = IncomeTaxReturn.objects.filter(user=user).order_by('-income_tax_return_year__start_date')
+        if not income_tax_returns.exists():
+            income_tax_return_years = IncomeTaxReturnYears.objects.all()
+            for year in income_tax_return_years:
+                IncomeTaxReturn.objects.create(
+                    user=user,
+                    income_tax_return_year=year,
+                    status=IncomeTaxReturn.NotFiled
+                )
         serializer = IncomeTaxReturnSerializer(income_tax_returns, many=True)
-        return Response(serializer.data)
+        return Response({'status_code': 200, 'status_text': 'OK', 'data': serializer.data})

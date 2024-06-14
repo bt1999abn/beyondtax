@@ -17,7 +17,7 @@ class IncomeTaxAddressInline(admin.TabularInline):
 class IncomeTaxProfileAdmin(admin.ModelAdmin):
     inlines = [IncomeTaxAddressInline, IncomeTaxBankDetailsInline,]
     list_display = ('first_name', 'last_name', 'aadhar_no', 'date_of_birth','fathers_name','mobile_number','email')
-    search_fields = ['gender', 'residential_status']
+    search_fields = ('gender', 'residential_status')
 
 
 class IncomeTaxReturnInline(admin.TabularInline):
@@ -27,7 +27,7 @@ class IncomeTaxReturnInline(admin.TabularInline):
 
 class IncomeTaxReturnYearsAdmin(admin.ModelAdmin):
     inlines = [IncomeTaxReturnInline, ]
-    list_display = ('start_date', 'end_date', 'due_date', 'status')
+    list_display = ('name', 'start_date', 'end_date', 'due_date', 'status')
     search_fields = ['status']
 
 
