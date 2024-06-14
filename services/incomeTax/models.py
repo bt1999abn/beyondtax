@@ -76,6 +76,7 @@ class IncomeTaxReturnYears(abstract_models.BaseModel):
         (Open, 'open'),
         (Closed, 'closed'),
     )
+    name = models.CharField(max_length=255, blank=True)
     start_date = models.DateField()
     end_date = models.DateField()
     due_date = models.DateField()
@@ -83,14 +84,15 @@ class IncomeTaxReturnYears(abstract_models.BaseModel):
 
 
 class IncomeTaxReturn(abstract_models.BaseModel):
-    PartiallyFiled, Filed, NotFiled = 1, 2, 3
+    NotFiled, PartiallyFiled, Filed = 1, 2, 3
     STATUS_CHOICES =(
+        (NotFiled, 'Not Filed'),
         (PartiallyFiled, 'Partially Filed'),
         (Filed, 'Filed'),
-        (NotFiled, 'Not Filed'),
     )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='income_tax_returns')
     income_tax_return_year = models.ForeignKey(IncomeTaxReturnYears, on_delete=models.CASCADE, related_name='income_tax_return_year')
-    status = models.IntegerField(choices=STATUS_CHOICES, blank=True)
+    status = models.IntegerField(choices=STATUS_CHOICES, blank=True, default=1)
+
 
 

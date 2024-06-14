@@ -74,7 +74,7 @@ class IncomeTaxBankDetailsSerializer(serializers.ModelSerializer):
 class IncomeTaxReturnYearSerializer(serializers.ModelSerializer):
     class Meta:
         model = IncomeTaxReturnYears
-        fields = ('id', 'start_date', 'end_date', 'due_date', 'status')
+        fields = ('id','name','start_date', 'end_date', 'due_date', 'status')
 
 
 class IncomeTaxReturnSerializer(serializers.ModelSerializer):
@@ -83,6 +83,3 @@ class IncomeTaxReturnSerializer(serializers.ModelSerializer):
     class Meta:
         model = IncomeTaxReturn
         fields = ('id', 'user', 'income_tax_return_year', 'status')
-
-
-
