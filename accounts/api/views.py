@@ -188,21 +188,22 @@ class SendEmailOtpApi(APIView):
         try:
             user = User.objects.get(email=email)
             otp_service = SendEmailOtpService()
-            otp_session_id = otp_service.send_otp(user)
-            return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_session_id': otp_session_id}, status=status.HTTP_200_OK)
+            otp_id = otp_service.send_otp(user)
+            return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_id': otp_id}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'status': 'error', 'message': 'User with this email does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class VerifyEmailOtpApi(APIView):
     def post(self, request, *args, **kwargs):
-        otp_session_id = request.data.get('otp_session_id')
+        otp_id = request.data.get('otp_id')
         otp = request.data.get('otp')
         if not otp:
             return Response({'status': 'error', 'message': 'OTP is a required field'},
                             status=status.HTTP_400_BAD_REQUEST)
+
         otp_service = SendEmailOtpService()
-        if otp_service.verify_otp(otp_session_id, otp):
+        if otp_service.verify_otp(otp_id, otp):
             return Response({'status': 'success', 'message': 'OTP verification successful'}, status=status.HTTP_200_OK)
         else:
             return Response({'status': 'error', 'message': 'Invalid or expired OTP'},
@@ -282,11 +283,11 @@ class ResetPasswordApi(APIView):
     def post(self, request, *args, **kwargs):
         serializer = PasswordResetSerializer(data=request.data)
         if serializer.is_valid():
-            otp_session_id = serializer.validated_data['otp_session_id']
+            otp_id = serializer.validated_data['otp_id']
             password = serializer.validated_data['password']
 
             try:
-                otp_record = OtpRecord.objects.get(otp_session_id=otp_session_id)
+                otp_record = OtpRecord.objects.get(id=otp_id)
                 user = User.objects.get(email=otp_record.email)
                 user.password = make_password(password)
                 user.save()
