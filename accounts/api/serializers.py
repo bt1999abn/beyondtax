@@ -274,12 +274,12 @@ class UserBusinessContactPersonsSerializer(serializers.ModelSerializer):
 
 
 class PasswordResetSerializer(serializers.Serializer):
-    otp_session_id = serializers.CharField(required=True)
+    otp_id = serializers.IntegerField(required=True)
     password = serializers.CharField(required=True, write_only=True)
     confirm_password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, attrs):
-        otp_session_id = attrs.get('otp_session_id')
+        otp_id = attrs.get('otp_id')
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
 
@@ -287,12 +287,12 @@ class PasswordResetSerializer(serializers.Serializer):
             raise serializers.ValidationError("Passwords do not match.")
 
         try:
-            otp_record = OtpRecord.objects.get(otp_session_id=otp_session_id)
+            otp_record = OtpRecord.objects.get(id=otp_id)
             user = User.objects.get(email=otp_record.email)
             if check_password(password, user.password):
                 raise serializers.ValidationError("New password cannot be the same as the old password.")
         except OtpRecord.DoesNotExist:
-            raise serializers.ValidationError("Invalid OTP session ID.")
+            raise serializers.ValidationError("Invalid OTP ID.")
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found.")
 
