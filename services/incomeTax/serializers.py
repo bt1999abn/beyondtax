@@ -24,7 +24,6 @@ class IncomeTaxAddressSerializer(serializers.ModelSerializer):
         fields = ['door_no', 'permise_name', 'street', 'area', 'city', 'state', 'pincode', 'country']
         extra_kwargs = {
             'door_no': {'required': True},
-            'permise_name': {'required': True},
             'street': {'required': True},
             'area': {'required': True},
             'city': {'required': True},
@@ -51,19 +50,21 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'first_name': {'required': True},
-            'middle_name': {'required': True},
             'last_name': {'required': True},
             'date_of_birth': {'required': True},
             'fathers_name': {'required': True},
             'gender': {'required': True},
             'marital_status': {'required': True},
-            'aadhar_no': {'required': True},
-            'aadhar_enrollment_no': {'required': True},
             'pan_no': {'required': True},
             'mobile_number': {'required': True},
             'email': {'required': True},
             'residential_status': {'required': True},
         }
+
+    def validate(self, data):
+        if not data.get('aadhar_no') and not data.get('aadhar_enrollment_no'):
+            raise serializers.ValidationError("Either 'aadhar_no' or 'aadhar_enrollment_no' must be provided.")
+        return data
 
     def validate_date_of_birth(self, value):
         try:
