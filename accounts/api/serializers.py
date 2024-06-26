@@ -54,7 +54,7 @@ class RegistrationSerializer(serializers.Serializer):
     full_name = serializers.CharField(required=False)
     date_of_birth = serializers.DateField(format='%d-%m-%Y', input_formats=['%d-%m-%Y'], required=False)
     password = serializers.CharField(max_length=128, required=True)
-    state = serializers.ChoiceField(choices=User.STATES_CHOICES, required=True)
+    state = serializers.ChoiceField(choices=User.STATES_CHOICES, required=False)
     email = serializers.EmailField(required=False, allow_blank=False)
 
     business_name = serializers.CharField(required=False)
@@ -94,8 +94,6 @@ class RegistrationSerializer(serializers.Serializer):
         client_type = validated_data.get('client_type')
         user = User(
             mobile_number=validated_data['mobile_number'],
-            date_of_birth=validated_data['date_of_birth'],
-            state=validated_data['state'],
             email=validated_data.get('email', ''),
             client_type=client_type,
             is_active=False,
