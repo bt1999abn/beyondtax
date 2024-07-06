@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from services.incomeTax.models import IncomeTaxBankDetails, IncomeTaxAddress, IncomeTaxProfile, IncomeTaxReturnYears, \
-    IncomeTaxReturn
+    IncomeTaxReturn, ResidentialStatusQuestions, ResidentialStatusAnswer
 
 
 class IncomeTaxBankDetailsInline(admin.TabularInline):
@@ -31,5 +31,18 @@ class IncomeTaxReturnYearsAdmin(admin.ModelAdmin):
     search_fields = ['status']
 
 
+class ResidentialStatusAdmin(admin.ModelAdmin):
+    list_display = ('id', 'question', 'slug')
+    search_fields = ('question', 'slug')
+
+
+class ResidentialStatusAnswerAdmin(admin.ModelAdmin):
+    list_display = ('id','question', 'answer_text',)
+    search_fields = ('question__question', 'answer_text')
+    list_filter = ('question', 'income_tax')
+
+
 admin.site.register(IncomeTaxProfile, IncomeTaxProfileAdmin)
 admin.site.register(IncomeTaxReturnYears, IncomeTaxReturnYearsAdmin)
+admin.site.register(ResidentialStatusQuestions, ResidentialStatusAdmin)
+admin.site.register(ResidentialStatusAnswer, ResidentialStatusAnswerAdmin)

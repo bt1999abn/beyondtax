@@ -1,5 +1,7 @@
 from django.core.validators import RegexValidator
 from django.db import models
+from django.utils.text import slugify
+
 from beyondTax import settings
 from shared import abstract_models
 from accounts import constants as accounts_constants
@@ -19,11 +21,12 @@ class IncomeTaxProfile(abstract_models.BaseModel):
         (PreferNotToDisclose, 'prefer not to disclose'),
 
     )
-    IndianResident, NonResidentIndian, ResidentButNotOrdinarilyResidentIndian = 1, 2, 3
+    IndianResident, NonResidentIndian, IndianResidentButNotOrdinary, IndianResidentButOrdinary  = 1, 2, 3, 4
     RESIDENTIAL_STATUS_CHOICES =(
         (IndianResident, 'Indian Resident'),
         (NonResidentIndian, 'Non-Resident Indian'),
-        (ResidentButNotOrdinarilyResidentIndian, 'Resident But Not Ordinarily Resident Indian'),
+        (IndianResidentButNotOrdinary, 'IndianResident(NotOrdinary)'),
+        (IndianResidentButOrdinary, 'IndianResident(Ordinary)'),
     )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='income_tax_profile')
     first_name = models.CharField(max_length=255, blank=True)
@@ -94,5 +97,34 @@ class IncomeTaxReturn(abstract_models.BaseModel):
     income_tax_return_year = models.ForeignKey(IncomeTaxReturnYears, on_delete=models.CASCADE, related_name='income_tax_return_year')
     status = models.IntegerField(choices=STATUS_CHOICES, blank=True, default=1)
 
+
+class ResidentialStatusQuestions(abstract_models.BaseModel):
+    ToggledButtons, DropDown, RadioButtons, AutoComplete, MultiSelect = 1, 2, 3, 4, 5
+    OPTIONS_TYPE_CHOICES = (
+        (ToggledButtons, 'Toggled Buttons'),
+        (DropDown, 'Drop Down'),
+        (RadioButtons, 'Radio Buttons'),
+        (AutoComplete, 'Auto Complete'),
+        (MultiSelect, 'Multi Select'),
+    )
+    question = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    options = models.JSONField(default=list)
+    options_type = models.IntegerField(choices=OPTIONS_TYPE_CHOICES, default=1)
+    sequence = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.question)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.question
+
+
+class ResidentialStatusAnswer(abstract_models.BaseModel):
+    income_tax = models.ForeignKey(IncomeTaxProfile, on_delete=models.CASCADE, related_name='status_answers')
+    question = models.ForeignKey(ResidentialStatusQuestions, on_delete=models.CASCADE, related_name='answers')
+    answer_text = models.CharField(max_length=255)
 
 
