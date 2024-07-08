@@ -2,14 +2,14 @@ from django.contrib.auth import login, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.files.images import get_image_dimensions
 from django.shortcuts import redirect
-from django_filters.rest_framework import filters, DjangoFilterBackend
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, serializers, generics, parsers
+from rest_framework import status, serializers, generics
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, \
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
@@ -45,13 +45,14 @@ class LoginAPIView(knox_views.LoginView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
-        if serializer.is_valid(raise_exception=True):
-            user = serializer.validated_data['user']
-            login(request, user)
-            response = super().post(request, format=None)
-            return Response(response.data, status=status.HTTP_200_OK)
-        else:
-            return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        login(request, user)
+        response = super().post(request, format=None)
+        response.data.update({
+            'user': serializer.data['user']
+        })
+        return Response(response.data, status=status.HTTP_200_OK)
 
 
 class GoogleLoginApi(knox_views.LoginView):
@@ -175,10 +176,20 @@ class UserBasicDetailsApi(APIView):
 
 
 class UpcomingDueDatesApi(generics.ListAPIView):
-    queryset = UpcomingDueDates.objects.all()
     serializer_class = UpcomingDueDateSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = UpcomingDueDatesFilter
+
+    def get_queryset(self):
+        today = date.today()
+        first_day_of_month = today.replace(day=1)
+        next_month = first_day_of_month + timedelta(days=32)
+        last_day_of_month = next_month.replace(day=1) - timedelta(days=1)
+
+        return UpcomingDueDates.objects.filter(
+            date__gte=first_day_of_month,
+            date__lte=last_day_of_month
+        )
 
 
 class SendEmailOtpApi(APIView):

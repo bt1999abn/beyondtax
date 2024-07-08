@@ -13,11 +13,13 @@ class LoginSerializer(serializers.Serializer):
     email_or_mobile = serializers.CharField(required=False)
     password = serializers.CharField(max_length=128, required=True)
     token = serializers.CharField(required=False)
+    user = serializers.SerializerMethodField()
 
     def validate(self, attrs):
         email_or_mobile = attrs.get('email_or_mobile')
         password = attrs.get('password')
         token = attrs.get('token')
+
         if token:
             user = authenticate(request=self.context.get('request'), token=token)
             if not user:
@@ -37,6 +39,19 @@ class LoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid credetials.")
         attrs['user'] = user
         return attrs
+
+    def get_user(self, obj):
+        user = obj.get('user')
+        return {
+            'id': user.id,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'client_type': user.client_type,
+            'contact_person': user.contact_person,
+            'business_name': user.business_name,
+            'profile_picture': user.profile_picture.url if user.profile_picture else None
+        }
 
 
 class AuthSerializer(serializers.Serializer):
@@ -247,6 +262,12 @@ class UpcomingDueDateSerializer(serializers.ModelSerializer):
     class Meta:
         model = UpcomingDueDates
         fields = ['date', 'compliance_activity', 'service_type', 'penalty_fine_interest']
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.date:
+            ret['date'] = instance.date.strftime('%d-%m-%Y')
+        return ret
 
 
 class UpcomingDueDatesFilter(filters.FilterSet):
