@@ -71,5 +71,20 @@ sudo crontab -e
 grep CRON /var/log/syslog
 
 ## Save the logs to a file so that you can see the output.
+```
 
+
+# Update the Memory in the Linux
+First modify the volume in AWS --> instances --> Select Storage --> Volume --> Select and Modify
+
+```
+sudo growpart /dev/xvda 1
+sudo resize2fs /dev/xvda1
+```
+
+```
+# If there is no space left in the instance, you can clear trash
+rm -rf ~/.local/share/Trash/*
+```
+# Reference Link: https://www.youtube.com/watch?v=smuSDWglwEs
 ```
