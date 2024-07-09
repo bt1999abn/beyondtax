@@ -94,14 +94,8 @@ class RegistrationSerializer(serializers.Serializer):
         else:
             if not attrs.get('business_name'):
                 raise serializers.ValidationError("Business name is required for non-individual clients.")
-            if not attrs.get('business_contact_person'):
-                raise serializers.ValidationError("Business contact person is required for non-individual clients.")
             if not attrs.get('business_mobile_number'):
                 raise serializers.ValidationError("Business mobile number is required for non-individual clients.")
-            if not attrs.get('business_email'):
-                raise serializers.ValidationError("Business email is required for non-individual clients.")
-            if User.objects.filter(business_email=attrs.get('business_email')).exists():
-                raise serializers.ValidationError("This business email is already used.")
 
         return attrs
 
@@ -120,9 +114,8 @@ class RegistrationSerializer(serializers.Serializer):
             user.last_name = name_parts[1] if len(name_parts) > 1 else ''
         else:
             user.business_name = validated_data['business_name']
-            user.business_contact_person = validated_data['business_contact_person']
             user.business_mobile_number = validated_data['business_mobile_number']
-            user.business_email = validated_data['business_email']
+            user.email = validated_data['email']
             user.is_active = False
         user.set_password(validated_data['password'])
         user.save()
@@ -258,16 +251,14 @@ class UserBasicDetailsSerializer(serializers.Serializer):
 
 
 class UpcomingDueDateSerializer(serializers.ModelSerializer):
+    formatted_date = serializers.SerializerMethodField()
 
     class Meta:
         model = UpcomingDueDates
-        fields = ['date', 'compliance_activity', 'service_type', 'penalty_fine_interest']
+        fields = ['formatted_date', 'date', 'compliance_activity', 'service_type', 'penalty_fine_interest']
 
-    def to_representation(self, instance):
-        ret = super().to_representation(instance)
-        if instance.date:
-            ret['date'] = instance.date.strftime('%d-%m-%Y')
-        return ret
+    def get_formatted_date(self, obj):
+        return obj.date.strftime('%d-%m-%Y')
 
 
 class UpcomingDueDatesFilter(filters.FilterSet):
@@ -316,3 +307,9 @@ class PasswordResetSerializer(serializers.Serializer):
             raise serializers.ValidationError("User not found.")
 
         return attrs
+
+
+class UpdateUserTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'client_type']
