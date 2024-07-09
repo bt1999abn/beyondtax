@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.files.images import get_image_dimensions
@@ -9,12 +11,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers, generics
 from django.utils import timezone
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime
 from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, \
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
     BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter, \
-    PasswordResetSerializer
+    PasswordResetSerializer, UpdateUserTypeSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails
 from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
@@ -192,6 +194,28 @@ class UpcomingDueDatesApi(generics.ListAPIView):
         )
 
 
+class UpcomingDueDatesByMonthApi(APIView):
+    def get(self, request, *args, **kwargs):
+        due_dates = UpcomingDueDates.objects.all()
+        serializer = UpcomingDueDateSerializer(due_dates, many=True)
+
+        grouped_by_month = defaultdict(list)
+        for due_date in serializer.data:
+            if 'formatted_date' in due_date:
+                due_date_obj = datetime.strptime(due_date['formatted_date'], '%d-%m-%Y')
+                month_key = due_date_obj.strftime('%B %Y')
+                grouped_by_month[month_key].append(due_date)
+
+        response_data = []
+        for month, due_dates in grouped_by_month.items():
+            response_data.append({
+                'month': month,
+                'due_dates': due_dates
+            })
+
+        return Response(response_data)
+
+
 class SendEmailOtpApi(APIView):
 
     def post(self, request, *args, **kwargs):
@@ -312,3 +336,19 @@ class ResetPasswordApi(APIView):
                 return Response({'status': 'error', 'message': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateUserTypeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        user = request.user
+        serializer = UpdateUserTypeSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'id': serializer.data['id'],
+                'client_type': serializer.data['client_type'],
+                'message': 'User type updated successfully'
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
