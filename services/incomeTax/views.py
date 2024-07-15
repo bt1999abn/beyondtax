@@ -3,9 +3,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, ResidentialStatusQuestions
+from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, \
+    ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress
 from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     IncomeTaxReturnSerializer, ResidentialStatusQuestionsSerializer
+from services.incomeTax.services import PanVerificationService
 
 
 class IncomeTaxProfileApi(APIView):
@@ -88,3 +90,111 @@ class ResidentialStatusQuestionsListView(APIView):
         questions = ResidentialStatusQuestions.objects.all()
         serializer = ResidentialStatusQuestionsSerializer(questions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class SendPanVerificationOtpApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        pan_number = request.data.get('pan_number')
+
+        try:
+            tax_profile = IncomeTaxProfile.objects.get(pan_no=pan_number)
+            user = tax_profile.user
+
+            if not user.email:
+                return Response({'status': 'error', 'message': 'No email associated with this PAN number'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            pan_service = PanVerificationService()
+            otp_id = pan_service.send_pan_verification_otp(user, pan_number)
+            return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_id': otp_id},
+                            status=status.HTTP_200_OK)
+
+        except IncomeTaxProfile.DoesNotExist:
+            return Response({'status': 'error', 'message': 'User with this PAN number does not exist'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+
+class VerifyPanOtpApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        otp_id = request.data.get('otp_id')
+        otp = request.data.get('otp')
+        if not otp:
+            return Response({'status': 'error', 'message': 'OTP is a required field'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pan_service = PanVerificationService()
+        if pan_service.verify_pan_otp(otp_id, otp):
+            user = request.user
+            income_tax_return_years = IncomeTaxReturnYears.objects.all()
+            created_records = []
+            for year in income_tax_return_years:
+                tax_return = IncomeTaxReturn.objects.create(
+                    user=user,
+                    income_tax_return_year=year,
+                    status=IncomeTaxReturn.NotFiled
+                )
+                created_records.append(tax_return)
+            serializer = IncomeTaxReturnSerializer(created_records, many=True)
+            return Response({
+                'status_code': 200,
+                'status_text': 'OK',
+                'data': {
+                    'status': 'success',
+                    'message': 'PAN OTP verification successful and tax return record created',
+                    'tax_return_records': serializer.data
+                }
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'message': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ImportIncomeTaxProfileDataApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+
+        # Create IncomeTaxProfile
+        income_tax_profile = IncomeTaxProfile.objects.create(
+            user=user,
+            first_name='beyond',
+            middle_name='t',
+            last_name='Tax',
+            date_of_birth='2024-01-01',
+            fathers_name='Father Beyondtax',
+            gender=IncomeTaxProfile.MALE,
+            marital_status=IncomeTaxProfile.Married,
+            aadhar_no='123456789012',
+            aadhar_enrollment_no='123456789012345678901234',
+            pan_no='ABCDE1234F',
+            mobile_number='9876543210',
+            email='johndoe@example.com',
+            residential_status=IncomeTaxProfile.IndianResident
+        )
+
+        # Create IncomeTaxBankDetails
+        IncomeTaxBankDetails.objects.create(
+            income_tax=income_tax_profile,
+            account_no='1234567890',
+            ifsc_code='IFSC0001234',
+            bank_name='Bank of Example',
+            type=IncomeTaxBankDetails.SavingsAccount
+        )
+
+        # Create IncomeTaxAddress
+        IncomeTaxAddress.objects.create(
+            income_tax=income_tax_profile,
+            door_no='123',
+            permise_name='Premise Name',
+            street='Street Name',
+            area='Area Name',
+            city='City Name',
+            state='State Name',
+            pincode='123456',
+            country='Country Name'
+        )
+
+        return Response({'status': 'success', 'message': 'Tax profile data imported successfully'}, status=status.HTTP_201_CREATED)

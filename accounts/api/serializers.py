@@ -5,6 +5,7 @@ from django_filters import rest_framework as filters
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord
+from services.incomeTax.models import IncomeTaxProfile
 
 User = get_user_model()
 
@@ -42,11 +43,20 @@ class LoginSerializer(serializers.Serializer):
 
     def get_user(self, obj):
         user = obj.get('user')
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        try:
+            income_tax_profile = user.income_tax_profile.first()  # Assuming user has one IncomeTaxProfile
+            pan_no = income_tax_profile.pan_no if income_tax_profile else None
+        except IncomeTaxProfile.DoesNotExist:
+            pan_no = None
+
         return {
             'id': user.id,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
+            'full_name': full_name,
             'email': user.email,
+            'mobile_number': user.mobile_number,
+            'date_of_birth': user.date_of_birth,
+            'pan_no': pan_no,
             'client_type': user.client_type,
             'contact_person': user.contact_person,
             'business_name': user.business_name,
