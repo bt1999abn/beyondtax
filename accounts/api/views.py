@@ -125,7 +125,7 @@ class ProfileApiView(APIView):
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        serializer = RegistrationSerializer(user)
+        serializer = UserProfileSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
