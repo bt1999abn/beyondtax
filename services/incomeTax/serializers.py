@@ -54,7 +54,8 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'first_name', 'middle_name', 'last_name', 'date_of_birth', 'fathers_name',
             'gender', 'marital_status', 'aadhar_no', 'aadhar_enrollment_no', 'pan_no', 'mobile_number',
-            'email', 'residential_status', 'income_tax_bankdetails', 'address', 'answers', 'created_at', 'updated_at'
+            'email', 'residential_status', 'income_tax_bankdetails', 'address', 'answers', 'created_at', 'updated_at',
+
         ]
 
     def validate(self, data):
@@ -201,10 +202,10 @@ class IncomeTaxReturnYearSerializer(serializers.ModelSerializer):
 
 class IncomeTaxReturnSerializer(serializers.ModelSerializer):
     income_tax_return_year = IncomeTaxReturnYearSerializer()
-
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     class Meta:
         model = IncomeTaxReturn
-        fields = ('id', 'user', 'income_tax_return_year', 'status')
+        fields = ('id', 'user', 'income_tax_return_year', 'status', 'status_display')
 
 
 class ResidentialStatusQuestionsSerializer(serializers.ModelSerializer):
