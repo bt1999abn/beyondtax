@@ -28,7 +28,7 @@ class IncomeTaxProfile(abstract_models.BaseModel):
         (IndianResidentButNotOrdinary, 'IndianResident(NotOrdinary)'),
         (IndianResidentButOrdinary, 'IndianResident(Ordinary)'),
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='income_tax_profile')
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='income_tax_profile')
     first_name = models.CharField(max_length=255, blank=True)
     middle_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
@@ -45,6 +45,7 @@ class IncomeTaxProfile(abstract_models.BaseModel):
     mobile_number = models.CharField(validators=[mobile_regex], max_length=10, blank=True)
     email = models.CharField(max_length=255, blank=True)
     residential_status = models.IntegerField(choices=RESIDENTIAL_STATUS_CHOICES, blank=True)
+    is_pan_verified = models.BooleanField(default=False, blank=True)
     REQUIRED_FIELDS = 'pan_no'
 
 
@@ -96,6 +97,9 @@ class IncomeTaxReturn(abstract_models.BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='income_tax_returns')
     income_tax_return_year = models.ForeignKey(IncomeTaxReturnYears, on_delete=models.CASCADE, related_name='income_tax_return_year')
     status = models.IntegerField(choices=STATUS_CHOICES, blank=True, default=1)
+
+    def get_status_display(self):
+        return dict(self.STATUS_CHOICES).get(self.status, 'Unknown')
 
 
 class ResidentialStatusQuestions(abstract_models.BaseModel):

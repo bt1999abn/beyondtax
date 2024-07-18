@@ -72,17 +72,21 @@ class ListIncomeTaxReturnsView(APIView):
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        income_tax_returns = IncomeTaxReturn.objects.filter(user=user).order_by('-income_tax_return_year__start_date')
-        if not income_tax_returns.exists():
-            income_tax_return_years = IncomeTaxReturnYears.objects.all()
-            for year in income_tax_return_years:
-                IncomeTaxReturn.objects.create(
-                    user=user,
-                    income_tax_return_year=year,
-                    status=IncomeTaxReturn.NotFiled
-                )
+        income_tax_returns = IncomeTaxReturn.objects.filter(user=user).order_by(
+            '-income_tax_return_year__start_date')
         serializer = IncomeTaxReturnSerializer(income_tax_returns, many=True)
-        return Response({'status_code': 200, 'status_text': 'OK', 'data': serializer.data})
+        response_data = [
+            {
+                'name': record['income_tax_return_year']['name'],
+                'status': record['status_display']
+            }
+            for record in serializer.data
+        ]
+        return Response({
+            'status_code': 200,
+            'status_text': 'OK',
+            'data': response_data
+        })
 
 
 class ResidentialStatusQuestionsListView(APIView):
@@ -128,7 +132,12 @@ class VerifyPanOtpApi(APIView):
         pan_service = PanVerificationService()
         if pan_service.verify_pan_otp(otp_id, otp):
             user = request.user
-            income_tax_return_years = IncomeTaxReturnYears.objects.all()
+            income_tax_profile = user.income_tax_profile
+            if income_tax_profile:
+                income_tax_profile.is_pan_verified = True
+                income_tax_profile.save()
+
+            income_tax_return_years = IncomeTaxReturnYears.objects.filter(status=IncomeTaxReturnYears.Open)
             created_records = []
             for year in income_tax_return_years:
                 tax_return = IncomeTaxReturn.objects.create(
@@ -136,15 +145,18 @@ class VerifyPanOtpApi(APIView):
                     income_tax_return_year=year,
                     status=IncomeTaxReturn.NotFiled
                 )
-                created_records.append(tax_return)
-            serializer = IncomeTaxReturnSerializer(created_records, many=True)
+                created_records.append({
+                    'status': tax_return.get_status_display(),
+                    'name': year.name
+                })
+
             return Response({
                 'status_code': 200,
                 'status_text': 'OK',
                 'data': {
                     'status': 'success',
                     'message': 'PAN OTP verification successful and tax return record created',
-                    'tax_return_records': serializer.data
+                    'is_pan_verified': income_tax_profile.is_pan_verified
                 }
             }, status=status.HTTP_200_OK)
         else:
