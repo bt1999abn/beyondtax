@@ -75,6 +75,9 @@ class ListIncomeTaxReturnsView(APIView):
         income_tax_returns = IncomeTaxReturn.objects.filter(user=user).order_by(
             '-income_tax_return_year__start_date')
         serializer = IncomeTaxReturnSerializer(income_tax_returns, many=True)
+        income_tax_profile = IncomeTaxProfile.objects.filter(user=user).first()
+        is_pan_verified = income_tax_profile.is_pan_verified if income_tax_profile else False
+        is_data_imported = income_tax_profile.is_data_imported if income_tax_profile else False
         response_data = [
             {
                 'name': record['income_tax_return_year']['name'],
@@ -85,7 +88,9 @@ class ListIncomeTaxReturnsView(APIView):
         return Response({
             'status_code': 200,
             'status_text': 'OK',
-            'data': response_data
+            'data': response_data,
+            'is_pan_verified': is_pan_verified,
+            'is_data_imported': is_data_imported
         })
 
 
@@ -168,45 +173,50 @@ class ImportIncomeTaxProfileDataApi(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
-
-        # Create IncomeTaxProfile
-        income_tax_profile = IncomeTaxProfile.objects.create(
+        income_tax_profile, created = IncomeTaxProfile.objects.update_or_create(
             user=user,
-            first_name='beyond',
-            middle_name='t',
-            last_name='Tax',
-            date_of_birth='2024-01-01',
-            fathers_name='Father Beyondtax',
-            gender=IncomeTaxProfile.MALE,
-            marital_status=IncomeTaxProfile.Married,
-            aadhar_no='123456789012',
-            aadhar_enrollment_no='123456789012345678901234',
-            pan_no='ABCDE1234F',
-            mobile_number='9876543210',
-            email='johndoe@example.com',
-            residential_status=IncomeTaxProfile.IndianResident
+            defaults={
+                'first_name': 'beyond',
+                'middle_name': 't',
+                'last_name': 'Tax',
+                'date_of_birth': '2024-01-01',
+                'fathers_name': 'Father Beyondtax',
+                'gender': IncomeTaxProfile.MALE,
+                'marital_status': IncomeTaxProfile.Married,
+                'aadhar_no': '123456789012',
+                'aadhar_enrollment_no': '123456789012345678901234',
+                'pan_no': 'ABCDE1234F',
+                'mobile_number': '9876543210',
+                'email': 'johndoe@example.com',
+                'residential_status': IncomeTaxProfile.IndianResident,
+                'is_data_imported': True
+            }
         )
-
-        # Create IncomeTaxBankDetails
-        IncomeTaxBankDetails.objects.create(
+        IncomeTaxBankDetails.objects.update_or_create(
             income_tax=income_tax_profile,
-            account_no='1234567890',
-            ifsc_code='IFSC0001234',
-            bank_name='Bank of Example',
-            type=IncomeTaxBankDetails.SavingsAccount
+            defaults={
+                'account_no': '1234567890',
+                'ifsc_code': 'IFSC0001234',
+                'bank_name': 'Bank of Example',
+                'type': IncomeTaxBankDetails.SavingsAccount
+            }
         )
-
-        # Create IncomeTaxAddress
-        IncomeTaxAddress.objects.create(
+        IncomeTaxAddress.objects.update_or_create(
             income_tax=income_tax_profile,
-            door_no='123',
-            permise_name='Premise Name',
-            street='Street Name',
-            area='Area Name',
-            city='City Name',
-            state='State Name',
-            pincode='123456',
-            country='Country Name'
+            defaults={
+                'door_no': '123',
+                'permise_name': 'Premise Name',
+                'street': 'Street Name',
+                'area': 'Area Name',
+                'city': 'City Name',
+                'state': 'State Name',
+                'pincode': '123456',
+                'country': 'Country Name'
+            }
         )
+        if created:
+            message = 'Tax profile data created successfully'
+        else:
+            message = 'Tax profile data updated successfully'
 
-        return Response({'status': 'success', 'message': 'Tax profile data imported successfully'}, status=status.HTTP_201_CREATED)
+        return Response({'status': 'success', 'message': message, 'is_data_imported': True}, status=status.HTTP_201_CREATED)
