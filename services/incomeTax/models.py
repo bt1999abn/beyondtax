@@ -46,6 +46,7 @@ class IncomeTaxProfile(abstract_models.BaseModel):
     email = models.CharField(max_length=255, blank=True)
     residential_status = models.IntegerField(choices=RESIDENTIAL_STATUS_CHOICES, blank=True)
     is_pan_verified = models.BooleanField(default=False, blank=True)
+    is_data_imported = models.BooleanField(default=False, blank=True)
     REQUIRED_FIELDS = 'pan_no'
 
 

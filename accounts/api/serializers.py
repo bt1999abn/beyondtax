@@ -47,10 +47,8 @@ class LoginSerializer(serializers.Serializer):
         try:
             income_tax_profile = user.income_tax_profile  # Assuming user has one IncomeTaxProfile
             pan_no = income_tax_profile.pan_no if income_tax_profile else None
-            is_pan_verified = income_tax_profile.is_pan_verified if income_tax_profile else False
         except IncomeTaxProfile.DoesNotExist:
             pan_no = None
-            is_pan_verified = False
         return {
             'id': user.id,
             'full_name': full_name,
@@ -58,7 +56,6 @@ class LoginSerializer(serializers.Serializer):
             'mobile_number': user.mobile_number,
             'date_of_birth': user.date_of_birth,
             'pan_no': pan_no,
-            'is_pan_verified': is_pan_verified,
             'client_type': user.client_type,
             'contact_person': user.contact_person,
             'business_name': user.business_name,
