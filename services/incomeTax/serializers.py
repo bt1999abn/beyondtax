@@ -4,7 +4,9 @@ from django.core.validators import RegexValidator
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxAddress, IncomeTaxReturnYears, \
-    IncomeTaxReturn, ResidentialStatusQuestions, ResidentialStatusAnswer
+    IncomeTaxReturn, ResidentialStatusQuestions, ResidentialStatusAnswer, SalaryIncome, RentalIncome, BuyerDetails, \
+    CapitalGains, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, IncomeFromBetting, DividendIncome, \
+    InterestOnItRefunds, ExemptIncome, BusinessIncome, AgricultureIncome, LandDetails, Deductions, InterestIncome
 
 
 class IncomeTaxBankDetailsSerializer(serializers.ModelSerializer):
@@ -217,3 +219,201 @@ class ResidentialStatusQuestionsSerializer(serializers.ModelSerializer):
 
     def get_options_type_name(self, obj):
         return obj.get_options_type_display()
+
+
+class SalaryIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SalaryIncome
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class RentalIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RentalIncome
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class BuyerDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BuyerDetails
+        fields = "__all__"
+
+
+class CapitalGainsSerializer(serializers.ModelSerializer):
+    buyer_details = BuyerDetailsSerializer(many=True, required=False)
+
+    class Meta:
+        model = CapitalGains
+        fields = "__all__"
+
+    def create(self, validated_data):
+        buyer_details_data = validated_data.pop('buyer_details', [])
+        capital_gains = CapitalGains.objects.create(**validated_data)
+        for buyer_data in buyer_details_data:
+            BuyerDetails.objects.create(capital_gains=capital_gains, **buyer_data)
+        return capital_gains
+
+    def update(self, instance, validated_data):
+        buyer_details_data = validated_data.pop('buyer_details', [])
+        instance = super().update(instance, validated_data)
+
+        for buyer_data in buyer_details_data:
+            BuyerDetails.objects.update_or_create(
+                capital_gains=instance,
+                id=buyer_data.get('id'),
+                defaults=buyer_data
+            )
+        return instance
+
+
+class LandDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandDetails
+        fields = "__all__"
+
+
+class AgricultureIncomeSerializer(serializers.ModelSerializer):
+    land_details = LandDetailsSerializer(many=True, required=False)
+
+    class Meta:
+        model = AgricultureIncome
+        fields = "__all__"
+
+    def create(self, validated_data):
+        land_details_data = validated_data.pop('land_details', [])
+        agriculture_income = AgricultureIncome.objects.create(**validated_data)
+        for land_data in land_details_data:
+            LandDetails.objects.create(agriculture_income=agriculture_income, **land_data)
+        return agriculture_income
+
+    def update(self, instance, validated_data):
+        land_details_data = validated_data.pop('land_details', [])
+        instance = super().update(instance, validated_data)
+
+        for land_data in land_details_data:
+            LandDetails.objects.update_or_create(
+                agriculture_income=instance,
+                id=land_data.get('id'),
+                defaults=land_data
+            )
+        return instance
+
+
+class BusinessIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessIncome
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class ExemptIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExemptIncome
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class InterestIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterestIncome
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class InterestOnItRefundsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterestOnItRefunds
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class DividendIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DividendIncome
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class IncomeFromBettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncomeFromBetting
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class TdsOrTcsDeductionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TdsOrTcsDeduction
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class SelfAssesmentAndAdvanceTaxPaidSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SelfAssesmentAndAdvanceTaxPaid
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class DeductionsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deductions
+        fields = "__all__"
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
