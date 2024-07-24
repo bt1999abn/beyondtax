@@ -252,7 +252,7 @@ class BusinessIncome(abstract_models.BaseModel):
     )
     income_tax = models.ForeignKey(IncomeTaxProfile, on_delete=models.CASCADE, related_name='business_income')
     income_tax_return = models.ForeignKey(IncomeTaxReturn, on_delete=models.CASCADE, related_name='business_income')
-    business_income_type = models.IntegerField(choices=BUSINESS_INCOME_TYPE_CHOICES)
+    business_income_type = models.CharField(choices=BUSINESS_INCOME_TYPE_CHOICES)
     business_name = models.CharField(max_length=255)
     industry = models.IntegerField(choices=INDUSTRY_TYPE_CHOICES)
     nature_of_business = models.CharField(max_length=255)
@@ -372,7 +372,7 @@ class Deductions(abstract_models.BaseModel):
 
     income_tax = models.ForeignKey(IncomeTaxProfile, on_delete=models.CASCADE,
                                    related_name='deductions')
-    income_tax_return = models.ForeignKey(IncomeTaxReturn, on_delete=models.CASCADE,
+    income_tax_return = models.OneToOneField(IncomeTaxReturn, on_delete=models.CASCADE,
                                           related_name='deductions')
     life_insurance = models.DecimalField(max_digits=30, decimal_places=2)
     provident_fund = models.DecimalField(max_digits=30, decimal_places=2)
