@@ -1,3 +1,4 @@
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
@@ -11,9 +12,9 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     CapitalGainsSerializer, BusinessIncomeSerializer, AgricultureIncomeSerializer, InterestIncomeSerializer, \
     InterestOnItRefundsSerializer, DividendIncomeSerializer, IncomeFromBettingSerializer, TdsOrTcsDeductionSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
-    LandDetailsSerializer
+    LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer
 from services.incomeTax.services import PanVerificationService
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 
 class IncomeTaxProfileApi(APIView):
@@ -86,6 +87,7 @@ class ListIncomeTaxReturnsView(APIView):
         is_data_imported = income_tax_profile.is_data_imported if income_tax_profile else False
         response_data = [
             {
+                'id': record['id'],
                 'name': record['income_tax_return_year']['name'],
                 'status': record['status_display']
             }
@@ -235,12 +237,12 @@ class SalaryIncomeListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         return SalaryIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data.getlist('data')
@@ -270,7 +272,7 @@ class SalaryIncomeUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -299,12 +301,12 @@ class RentalIncomeListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         return RentalIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -329,7 +331,7 @@ class RentalIncomeUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -355,12 +357,12 @@ class CapitalGainsListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         return CapitalGains.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -391,7 +393,7 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -428,12 +430,12 @@ class BusinessIncomeListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         return BusinessIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -454,7 +456,7 @@ class BusinessIncomeUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -474,464 +476,356 @@ class BusinessIncomeUpdateApi(generics.GenericAPIView):
             return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of business incomes'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AgricultureIncomeListCreateApi(generics.ListCreateAPIView):
+class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = AgricultureIncomeSerializer
+    serializer_class = AgricultureAndExemptIncomeSerializer
 
-    def get_queryset(self):
+    def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return AgricultureIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
+        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
+
+        agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        exempt_incomes = ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+
+        data = {
+            'agriculture_incomes': AgricultureIncomeSerializer(agriculture_incomes, many=True).data,
+            'exempt_incomes': ExemptIncomeSerializer(exempt_incomes, many=True).data
+        }
+        return Response({'status': 'success', 'data': data}, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
 
-        created_records = []
-        for item in data:
+        created_records = {}
+        agriculture_incomes_data = data.get('agriculture_incomes', [])
+        agriculture_incomes_created = []
+        for item in agriculture_incomes_data:
             land_data = item.pop('land_details', [])
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
             item.pop('id', None)
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            agriculture_income = serializer.save()
-            created_records.append(serializer.data)
+
+            agriculture_serializer = AgricultureIncomeSerializer(data=item)
+            agriculture_serializer.is_valid(raise_exception=True)
+            agriculture_income = agriculture_serializer.save()
+            agriculture_incomes_created.append(agriculture_serializer.data)
+
             for land in land_data:
                 land['agriculture_income'] = agriculture_income.id
-                land.pop('id', None)  # Ensure 'id' is not included in land data
+                land.pop('id', None)
                 land_serializer = LandDetailsSerializer(data=land)
                 land_serializer.is_valid(raise_exception=True)
                 land_serializer.save()
-            updated_data = self.get_serializer(agriculture_income).data
-            created_records[-1] = updated_data
-        return Response(
-            {'status': 'success', 'message': 'Agriculture incomes created successfully', 'data': created_records},
-            status=status.HTTP_201_CREATED)
+            updated_data = AgricultureIncomeSerializer(agriculture_income).data
+            agriculture_incomes_created[-1] = updated_data
 
-
-class AgricultureIncomeUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = AgricultureIncomeSerializer
-
-    def patch(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                land_data = item.pop('land_details', [])
-                agriculture_income, created = AgricultureIncome.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(agriculture_income.id)
-
-                land_ids = []
-                for land in land_data:
-                    land_detail, land_created = LandDetails.objects.update_or_create(
-                        agriculture_income=agriculture_income,
-                        id=land.get('id'),
-                        defaults=land
-                    )
-                    land_ids.append(land_detail.id)
-                LandDetails.objects.filter(agriculture_income=agriculture_income).exclude(id__in=land_ids).delete()
-            AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Agriculture incomes updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of agriculture incomes'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ExemptIncomeListCreateApi(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ExemptIncomeSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return ExemptIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
-
-    def post(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        created_records = []
-        for item in data:
+        created_records['agriculture_incomes'] = agriculture_incomes_created
+        exempt_incomes_data = data.get('exempt_incomes', [])
+        exempt_incomes_created = []
+        for item in exempt_incomes_data:
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            record = serializer.save()
-            created_records.append(serializer.data)
-        return Response({'status': 'success', 'message': 'Exempt incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
-
-
-class ExemptIncomeUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ExemptIncomeSerializer
+            item.pop('id', None)
+            exempt_serializer = ExemptIncomeSerializer(data=item)
+            exempt_serializer.is_valid(raise_exception=True)
+            exempt_income = exempt_serializer.save()
+            exempt_incomes_created.append(exempt_serializer.data)
+        created_records['exempt_incomes'] = exempt_incomes_created
+        return Response({'status': 'success', 'message': 'Incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                exempt_income, created = ExemptIncome.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
+
+        updated_records = {}
+        agriculture_incomes_data = data.get('agriculture_incomes', [])
+        agriculture_incomes_updated = []
+        for item in agriculture_incomes_data:
+            land_data = item.pop('land_details', [])
+            agriculture_income, created = AgricultureIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            land_ids = []
+            for land in land_data:
+                land_detail, land_created = LandDetails.objects.update_or_create(
+                    agriculture_income=agriculture_income,
+                    id=land.get('id'),
+                    defaults=land
                 )
-                updated_ids.append(exempt_income.id)
-            ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Exempt incomes updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of exempt incomes'}, status=status.HTTP_400_BAD_REQUEST)
+                land_ids.append(land_detail.id)
+            LandDetails.objects.filter(agriculture_income=agriculture_income).exclude(id__in=land_ids).delete()
+            agriculture_incomes_updated.append(AgricultureIncomeSerializer(agriculture_income).data)
+
+        updated_records['agriculture_incomes'] = agriculture_incomes_updated
+        exempt_incomes_data = data.get('exempt_incomes', [])
+        exempt_incomes_updated = []
+        for item in exempt_incomes_data:
+            exempt_income, created = ExemptIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            exempt_incomes_updated.append(ExemptIncomeSerializer(exempt_income).data)
+        updated_records['exempt_incomes'] = exempt_incomes_updated
+        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records}, status=status.HTTP_200_OK)
 
 
-class InterestIncomeListCreateApi(generics.ListCreateAPIView):
+class OtherIncomesApi(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = InterestIncomeSerializer
+    serializer_class = OtherIncomesSerializer
 
-    def get_queryset(self):
+    def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return InterestIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
+        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
+        interest_incomes = InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        interest_on_it_refunds = InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        dividend_incomes = DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        income_from_betting = IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        data = {
+            'interest_incomes': InterestIncomeSerializer(interest_incomes, many=True).data,
+            'interest_on_it_refunds': InterestOnItRefundsSerializer(interest_on_it_refunds, many=True).data,
+            'dividend_incomes': DividendIncomeSerializer(dividend_incomes, many=True).data,
+            'income_from_betting': IncomeFromBettingSerializer(income_from_betting, many=True).data,
+        }
+        return Response({'status': 'success', 'data': data}, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
 
-        created_records = []
-        for item in data:
+        created_records = {}
+        interest_incomes_data = data.get('interest_incomes', [])
+        interest_incomes_created = []
+        for item in interest_incomes_data:
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            record = serializer.save()
-            created_records.append(serializer.data)
+            item.pop('id', None)
 
-        return Response({'status': 'success', 'message': 'Interest incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
+            interest_serializer = InterestIncomeSerializer(data=item)
+            interest_serializer.is_valid(raise_exception=True)
+            interest_income = interest_serializer.save()
+            interest_incomes_created.append(interest_serializer.data)
 
-
-class InterestIncomeUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = InterestIncomeSerializer
-
-    def patch(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                interest_income, created = InterestIncome.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(interest_income.id)
-            InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Interest incomes updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of interest incomes'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class InterestOnItRefundsListCreateApi(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = InterestOnItRefundsSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return InterestOnItRefunds.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
-
-    def post(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-
-        created_records = []
-        for item in data:
+        created_records['interest_incomes'] = interest_incomes_created
+        interest_on_it_refunds_data = data.get('interest_on_it_refunds', [])
+        interest_on_it_refunds_created = []
+        for item in interest_on_it_refunds_data:
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            record = serializer.save()
-            created_records.append(serializer.data)
+            item.pop('id', None)
 
-        return Response({'status': 'success', 'message': 'Interest on IT refunds created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
+            interest_on_it_refunds_serializer = InterestOnItRefundsSerializer(data=item)
+            interest_on_it_refunds_serializer.is_valid(raise_exception=True)
+            interest_on_it_refund = interest_on_it_refunds_serializer.save()
+            interest_on_it_refunds_created.append(interest_on_it_refunds_serializer.data)
 
-
-class InterestOnItRefundsUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = InterestOnItRefundsSerializer
-
-    def patch(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                interest_on_it_refund, created = InterestOnItRefunds.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(interest_on_it_refund.id)
-            InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Interest on IT refunds updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of interest on IT refunds'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class DividendIncomeListCreateApi(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = DividendIncomeSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return DividendIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
-
-    def post(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        created_records = []
-        for item in data:
+        created_records['interest_on_it_refunds'] = interest_on_it_refunds_created
+        dividend_incomes_data = data.get('dividend_incomes', [])
+        dividend_incomes_created = []
+        for item in dividend_incomes_data:
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            record = serializer.save()
-            created_records.append(serializer.data)
-        return Response({'status': 'success', 'message': 'Dividend incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
+            item.pop('id', None)
 
+            dividend_serializer = DividendIncomeSerializer(data=item)
+            dividend_serializer.is_valid(raise_exception=True)
+            dividend_income = dividend_serializer.save()
+            dividend_incomes_created.append(dividend_serializer.data)
 
-class DividendIncomeUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = DividendIncomeSerializer
-
-    def patch(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                dividend_income, created = DividendIncome.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(dividend_income.id)
-            DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Dividend incomes updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of dividend incomes'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class IncomeFromBettingListCreateApi(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = IncomeFromBettingSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return IncomeFromBetting.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
-
-    def post(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        created_records = []
-        for item in data:
+        created_records['dividend_incomes'] = dividend_incomes_created
+        income_from_betting_data = data.get('income_from_betting', [])
+        income_from_betting_created = []
+        for item in income_from_betting_data:
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            record = serializer.save()
-            created_records.append(serializer.data)
-        return Response({'status': 'success', 'message': 'Income from betting created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
+            item.pop('id', None)
 
+            betting_serializer = IncomeFromBettingSerializer(data=item)
+            betting_serializer.is_valid(raise_exception=True)
+            income_from_betting = betting_serializer.save()
+            income_from_betting_created.append(betting_serializer.data)
 
-class IncomeFromBettingUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = IncomeFromBettingSerializer
+        created_records['income_from_betting'] = income_from_betting_created
 
-    def patch(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                income_from_betting, created = IncomeFromBetting.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(income_from_betting.id)
-            IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Income from betting updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of income from betting'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class TdsOrTcsDeductionListCreateApi(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = TdsOrTcsDeductionSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return TdsOrTcsDeduction.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
-
-    def post(self, request, *args, **kwargs):
-        user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
-
-        created_records = []
-        for item in data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
-            serializer = self.get_serializer(data=item)
-            serializer.is_valid(raise_exception=True)
-            record = serializer.save()
-            created_records.append(serializer.data)
-
-        return Response({'status': 'success', 'message': 'TDS or TCS deductions created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
-
-
-class TdsOrTcsDeductionUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = TdsOrTcsDeductionSerializer
+        return Response({'status': 'success', 'message': 'Incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                tds_or_tcs_deduction, created = TdsOrTcsDeduction.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(tds_or_tcs_deduction.id)
-            TdsOrTcsDeduction.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'TDS or TCS deductions updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of TDS or TCS deductions'}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_records = {}
+        interest_incomes_data = data.get('interest_incomes', [])
+        interest_incomes_updated = []
+        for item in interest_incomes_data:
+            interest_income, created = InterestIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            interest_incomes_updated.append(InterestIncomeSerializer(interest_income).data)
+        updated_records['interest_incomes'] = interest_incomes_updated
+        interest_on_it_refunds_data = data.get('interest_on_it_refunds', [])
+        interest_on_it_refunds_updated = []
+        for item in interest_on_it_refunds_data:
+            interest_on_it_refund, created = InterestOnItRefunds.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            interest_on_it_refunds_updated.append(InterestOnItRefundsSerializer(interest_on_it_refund).data)
+        updated_records['interest_on_it_refunds'] = interest_on_it_refunds_updated
+        dividend_incomes_data = data.get('dividend_incomes', [])
+        dividend_incomes_updated = []
+        for item in dividend_incomes_data:
+            dividend_income, created = DividendIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            dividend_incomes_updated.append(DividendIncomeSerializer(dividend_income).data)
+        updated_records['dividend_incomes'] = dividend_incomes_updated
+        income_from_betting_data = data.get('income_from_betting', [])
+        income_from_betting_updated = []
+        for item in income_from_betting_data:
+            income_from_betting, created = IncomeFromBetting.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            income_from_betting_updated.append(IncomeFromBettingSerializer(income_from_betting).data)
+        updated_records['income_from_betting'] = income_from_betting_updated
+        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records}, status=status.HTTP_200_OK)
 
 
-class SelfAssesmentAndAdvanceTaxPaidListCreateApi(generics.ListCreateAPIView):
+class TaxPaidApi(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = SelfAssesmentAndAdvanceTaxPaidSerializer
+    serializer_class = TaxPaidSerializer
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
-    def get_queryset(self):
+    def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
-        return SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
+        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
+
+        tds_or_tcs_deductions = TdsOrTcsDeduction.objects.filter(income_tax=income_tax_profile,
+                                                                 income_tax_return=income_tax_return)
+        self_assessment_and_advance_tax_paid = SelfAssesmentAndAdvanceTaxPaid.objects.filter(
+            income_tax=income_tax_profile, income_tax_return=income_tax_return)
+
+        data = {
+            'tds_or_tcs_deductions': TdsOrTcsDeductionSerializer(tds_or_tcs_deductions, many=True).data,
+            'self_assessment_and_advance_tax_paid': SelfAssesmentAndAdvanceTaxPaidSerializer(
+                self_assessment_and_advance_tax_paid, many=True).data,
+        }
+
+        return Response({'status': 'success', 'data': data}, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data.getlist('data')
+
+        tds_data = request.data.getlist('tds_or_tcs_deductions')
+        self_assessment_data = request.data.getlist('self_assessment_and_advance_tax_paid')
         files = request.FILES.getlist('files')
 
-        if isinstance(data, list):
-            created_records = []
-            for item_data, file in zip(data, files):
-                item = eval(item_data)
-                item['income_tax'] = income_tax_profile.id
-                item['income_tax_return'] = income_tax_return.id
-                item['upload_challan'] = file
+        created_tds_records = []
+        for item in tds_data:
+            item_dict = json.loads(item)
+            item_dict['income_tax'] = income_tax_profile.id
+            item_dict['income_tax_return'] = income_tax_return.id
+            serializer = TdsOrTcsDeductionSerializer(data=item_dict)
+            serializer.is_valid(raise_exception=True)
+            record = serializer.save()
+            created_tds_records.append(serializer.data)
 
-                serializer = self.get_serializer(data=item)
-                serializer.is_valid(raise_exception=True)
-                record = serializer.save()
-                created_records.append(serializer.data)
+        created_self_assessment_records = []
+        for item_data, file in zip(self_assessment_data, files):
+            item_data_dict = json.loads(item_data)
+            item_data_dict['income_tax'] = income_tax_profile.id
+            item_data_dict['income_tax_return'] = income_tax_return.id
+            item_data_dict['upload_challan'] = file
+            serializer = SelfAssesmentAndAdvanceTaxPaidSerializer(data=item_data_dict)
+            serializer.is_valid(raise_exception=True)
+            record = serializer.save()
+            created_self_assessment_records.append(serializer.data)
 
-            return Response(
-                {'status': 'success', 'message': 'Self-assessment and advance tax paid records created successfully',
-                 'data': created_records},
-                status=status.HTTP_201_CREATED)
-        else:
-            return Response({'status': 'failure',
-                             'message': 'Invalid data format, expected a list of self-assessment and advance tax paid records'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-
-class SelfAssesmentAndAdvanceTaxPaidUpdateApi(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = SelfAssesmentAndAdvanceTaxPaidSerializer
+        return Response({
+            'status': 'success',
+            'message': 'Records created successfully',
+            'tds_or_tcs_deductions': created_tds_records,
+            'self_assessment_and_advance_tax_paid': created_self_assessment_records
+        }, status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
-        if isinstance(data, list):
-            updated_ids = []
-            for item in data:
-                self_assessment_and_advance_tax_paid, created = SelfAssesmentAndAdvanceTaxPaid.objects.update_or_create(
-                    income_tax=income_tax_profile,
-                    income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
-                )
-                updated_ids.append(self_assessment_and_advance_tax_paid.id)
-            SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Self-assessment and advance tax paid updated successfully'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of self-assessment and advance tax paid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        tds_data = data.get('tds_or_tcs_deductions', [])
+        self_assessment_data = data.get('self_assessment_and_advance_tax_paid', [])
+
+        updated_tds_ids = []
+        for item in tds_data:
+            item['income_tax'] = income_tax_profile
+            item['income_tax_return'] = income_tax_return
+            tds_or_tcs_deduction, created = TdsOrTcsDeduction.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item.get('id'),
+                defaults=item
+            )
+            updated_tds_ids.append(tds_or_tcs_deduction.id)
+
+        TdsOrTcsDeduction.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+            id__in=updated_tds_ids).delete()
+        updated_self_assessment_ids = []
+        for item_data in self_assessment_data:
+            item_data['income_tax'] = income_tax_profile
+            item_data['income_tax_return'] = income_tax_return
+            self_assessment_and_advance_tax_paid, created = SelfAssesmentAndAdvanceTaxPaid.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                id=item_data.get('id'),
+                defaults=item_data
+            )
+            updated_self_assessment_ids.append(self_assessment_and_advance_tax_paid.id)
+        SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax=income_tax_profile,
+                                                      income_tax_return=income_tax_return).exclude(
+            id__in=updated_self_assessment_ids).delete()
+        return Response({
+            'status': 'success',
+            'message': 'Records updated successfully',
+        }, status=status.HTTP_200_OK)
 
 
 class DeductionsApi(generics.GenericAPIView):
@@ -940,7 +834,7 @@ class DeductionsApi(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         try:
             deductions = Deductions.objects.get(income_tax__user=user, income_tax_return_id=income_tax_return_id)
             serializer = DeductionsSerializer(deductions)
@@ -950,7 +844,7 @@ class DeductionsApi(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -964,7 +858,7 @@ class DeductionsApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.request.query_params.get('income_tax_return_id')
+        income_tax_return_id = self.kwargs['income_tax_return_id']
         try:
             deductions = Deductions.objects.get(income_tax__user=user, income_tax_return_id=income_tax_return_id)
         except Deductions.DoesNotExist:

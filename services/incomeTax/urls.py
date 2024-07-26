@@ -1,13 +1,10 @@
 from django.urls import path
 from .views import IncomeTaxProfileApi, ListIncomeTaxReturnsView, ResidentialStatusQuestionsListView, \
-    SendPanVerificationOtpApi, VerifyPanOtpApi, ImportIncomeTaxProfileDataApi, TdsOrTcsDeductionUpdateApi, \
-    TdsOrTcsDeductionListCreateApi, IncomeFromBettingUpdateApi, IncomeFromBettingListCreateApi, DividendIncomeUpdateApi, \
-    DividendIncomeListCreateApi, SalaryIncomeListCreateApi, SalaryIncomeUpdateApi, RentalIncomeListCreateApi, \
-    RentalIncomeUpdateApi, CapitalGainsListCreateApi, CapitalGainsUpdateApi, AgricultureIncomeListCreateApi, \
-    AgricultureIncomeUpdateApi, BusinessIncomeListCreateApi, BusinessIncomeUpdateApi, ExemptIncomeListCreateApi, \
-    ExemptIncomeUpdateApi, InterestIncomeListCreateApi, InterestIncomeUpdateApi, InterestOnItRefundsListCreateApi, \
-    InterestOnItRefundsUpdateApi, DeductionsApi, SelfAssesmentAndAdvanceTaxPaidListCreateApi, \
-    SelfAssesmentAndAdvanceTaxPaidUpdateApi
+    SendPanVerificationOtpApi, VerifyPanOtpApi, ImportIncomeTaxProfileDataApi, \
+    SalaryIncomeListCreateApi, SalaryIncomeUpdateApi, RentalIncomeListCreateApi, \
+    RentalIncomeUpdateApi, CapitalGainsListCreateApi, CapitalGainsUpdateApi, \
+    BusinessIncomeListCreateApi, BusinessIncomeUpdateApi, DeductionsApi, AgricultureAndExemptIncomeApi, OtherIncomesApi, \
+    TaxPaidApi
 
 urlpatterns = [
     path('create-incometax-profile/', IncomeTaxProfileApi.as_view(), name='create-incometax-profile'),
@@ -18,33 +15,25 @@ urlpatterns = [
     path('send-pan-verification-otp/', SendPanVerificationOtpApi.as_view(), name='send_pan_verification_otp'),
     path('verify-pan-otp/', VerifyPanOtpApi.as_view(), name='verify_pan_otp'),
     path('import-tax-profile-data/', ImportIncomeTaxProfileDataApi.as_view(), name='import_tax_profile_data'),
-    path('salary-incomes/', SalaryIncomeListCreateApi.as_view(), name='salary-incomes-list-create'),
-    path('salary-incomes-update/', SalaryIncomeUpdateApi.as_view(), name='salary-incomes-update'),
-    path('rental-incomes/', RentalIncomeListCreateApi.as_view(), name='rental-incomes-list-create'),
-    path('rental-incomes-update/', RentalIncomeUpdateApi.as_view(), name='rental-incomes-update'),
-    path('capital-gains/', CapitalGainsListCreateApi.as_view(), name='capital-gains-list-create'),
-    path('capital-gains-update/', CapitalGainsUpdateApi.as_view(), name='capital-gains-update'),
-    path('agriculture-incomes/', AgricultureIncomeListCreateApi.as_view(), name='agriculture-incomes-list-create'),
-    path('agriculture-incomes-update/', AgricultureIncomeUpdateApi.as_view(), name='agriculture-incomes-update'),
-    path('business-incomes/', BusinessIncomeListCreateApi.as_view(), name='business-incomes-list-create'),
-    path('business-incomes-update/', BusinessIncomeUpdateApi.as_view(), name='business-incomes-update'),
-    path('exempt-incomes/', ExemptIncomeListCreateApi.as_view(), name='exempt-incomes-list-create'),
-    path('exempt-incomes-update/', ExemptIncomeUpdateApi.as_view(), name='exempt-incomes-update'),
-    path('interest-incomes/', InterestIncomeListCreateApi.as_view(), name='interest-incomes-list-create'),
-    path('interest-incomes-update/', InterestIncomeUpdateApi.as_view(), name='interest-incomes-update'),
-    path('interest-on-it-refunds/', InterestOnItRefundsListCreateApi.as_view(),
-         name='interest-on-it-refunds-list-create'),
-    path('interest-on-it-refunds-update/', InterestOnItRefundsUpdateApi.as_view(),
-         name='interest-on-it-refunds-update'),
-    path('dividend-incomes/', DividendIncomeListCreateApi.as_view(), name='dividend-incomes-list-create'),
-    path('dividend-incomes-update/', DividendIncomeUpdateApi.as_view(), name='dividend-incomes-update'),
-    path('income-from-betting/', IncomeFromBettingListCreateApi.as_view(), name='income-from-betting-list-create'),
-    path('income-from-betting-update/', IncomeFromBettingUpdateApi.as_view(), name='income-from-betting-update'),
-    path('tds-or-tcs-deductions/', TdsOrTcsDeductionListCreateApi.as_view(), name='tds-or-tcs-deductions-list-create'),
-    path('tds-or-tcs-deductions-update/', TdsOrTcsDeductionUpdateApi.as_view(), name='tds-or-tcs-deductions-update'),
-    path('self-assessment-and-advance-tax-paid/', SelfAssesmentAndAdvanceTaxPaidListCreateApi.as_view(),
-         name='self-assessment-and-advance-tax-paid-list-create'),
-    path('self-assessment-and-advance-tax-paid-update/', SelfAssesmentAndAdvanceTaxPaidUpdateApi.as_view(),
-         name='self-assessment-and-advance-tax-paid-update'),
-    path('deductions/', DeductionsApi.as_view(), name='deductions'),
+    path('salary-incomes/<int:income_tax_return_id>/', SalaryIncomeListCreateApi.as_view(),
+         name='salary-income-list-create'),
+    path('salary-incomes/<int:income_tax_return_id>/update/', SalaryIncomeUpdateApi.as_view(),
+         name='salary-income-update'),
+    path('rental-incomes/<int:income_tax_return_id>/', RentalIncomeListCreateApi.as_view(),
+         name='rental-income-list-create'),
+    path('rental-incomes/<int:income_tax_return_id>/update/', RentalIncomeUpdateApi.as_view(),
+         name='rental-income-update'),
+    path('capital-gains/<int:income_tax_return_id>/', CapitalGainsListCreateApi.as_view(),
+         name='capital-gains-list-create'),
+    path('capital-gains/<int:income_tax_return_id>/update/', CapitalGainsUpdateApi.as_view(),
+         name='capital-gains-update'),
+    path('business-incomes/<int:income_tax_return_id>/', BusinessIncomeListCreateApi.as_view(),
+         name='business-income-list-create'),
+    path('business-incomes/<int:income_tax_return_id>/update/', BusinessIncomeUpdateApi.as_view(),
+         name='business-income-update'),
+    path('agriculture-and-exempt-incomes/<int:income_tax_return_id>/', AgricultureAndExemptIncomeApi.as_view(),
+         name='agriculture-and-exempt-incomes'),
+    path('other-incomes/<int:income_tax_return_id>/', OtherIncomesApi.as_view(), name='other-incomes'),
+    path('tax-paid/<int:income_tax_return_id>/', TaxPaidApi.as_view(), name='tax-paid'),
+    path('deductions/<int:income_tax_return_id>/', DeductionsApi.as_view(), name='deductions'),
 ]

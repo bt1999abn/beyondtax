@@ -335,6 +335,14 @@ class ExemptIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
+class AgricultureAndExemptIncomeSerializer(serializers.ModelSerializer):
+    agriculture_incomes = AgricultureIncomeSerializer(many=True, required=False)
+    exempt_incomes = ExemptIncomeSerializer(many=True, required=False)
+
+    class Meta:
+        fields = ['agriculture_incomes', 'exempt_incomes']
+
+
 class InterestIncomeSerializer(serializers.ModelSerializer):
     class Meta:
         model = InterestIncome
@@ -383,6 +391,16 @@ class IncomeFromBettingSerializer(serializers.ModelSerializer):
         return instance
 
 
+class OtherIncomesSerializer(serializers.ModelSerializer):
+    interest_incomes = InterestIncomeSerializer(many=True, required=False)
+    interest_on_it_refunds = InterestOnItRefundsSerializer(many=True, required=False)
+    dividend_incomes = DividendIncomeSerializer(many=True, required=False)
+    income_from_betting = IncomeFromBettingSerializer(many=True, required=False)
+
+    class Meta:
+        fields = ['interest_incomes', 'interest_on_it_refunds', 'dividend_incomes', 'income_from_betting']
+
+
 class TdsOrTcsDeductionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TdsOrTcsDeduction
@@ -405,6 +423,14 @@ class SelfAssesmentAndAdvanceTaxPaidSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class TaxPaidSerializer(serializers.ModelSerializer):
+    tds_or_tcs_deductions = TdsOrTcsDeductionSerializer(many=True, required=False)
+    self_assessment_and_advance_tax_paid = SelfAssesmentAndAdvanceTaxPaidSerializer(many=True, required=False)
+
+    class Meta:
+        fields = ['tds_or_tcs_deductions', 'self_assessment_and_advance_tax_paid']
 
 
 class DeductionsSerializer(serializers.ModelSerializer):
