@@ -1,11 +1,14 @@
+from datetime import date
+
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import check_password
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import RegexValidator
 from django_filters import rest_framework as filters
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord
-from services.incomeTax.models import IncomeTaxProfile
+from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturnYears
 
 User = get_user_model()
 
@@ -45,10 +48,19 @@ class LoginSerializer(serializers.Serializer):
         user = obj.get('user')
         full_name = f"{user.first_name} {user.last_name}".strip()
         try:
-            income_tax_profile = user.income_tax_profile  # Assuming user has one IncomeTaxProfile
+            income_tax_profile = user.income_tax_profile
             pan_no = income_tax_profile.pan_no if income_tax_profile else None
         except IncomeTaxProfile.DoesNotExist:
             pan_no = None
+
+        current_date = date.today()
+        try:
+            current_year_record = IncomeTaxReturnYears.objects.get(
+                start_date__lte=current_date, end_date__gte=current_date
+            )
+            current_year_id = current_year_record.id
+        except ObjectDoesNotExist:
+            current_year_id = None
         return {
             'id': user.id,
             'full_name': full_name,
@@ -59,7 +71,8 @@ class LoginSerializer(serializers.Serializer):
             'client_type': user.client_type,
             'contact_person': user.contact_person,
             'business_name': user.business_name,
-            'profile_picture': user.profile_picture.url if user.profile_picture else None
+            'profile_picture': user.profile_picture.url if user.profile_picture else None,
+            'current_income_tax_return_year_id': current_year_id
         }
 
 
