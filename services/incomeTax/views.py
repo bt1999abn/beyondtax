@@ -375,9 +375,34 @@ class CapitalGainsListCreateApi(generics.ListCreateAPIView):
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
+
+        if isinstance(data, dict):
+            data = [data]
+
         created_records = []
+
         for item in data:
-            buyers_data = item.pop('buyer_details', [])
+            asset_type = item.get('asset_type')
+            buyers_data = item.get('buyer_details', [])
+
+            if asset_type == CapitalGains.HouseProperty:
+                required_fields = ['property_door_no', 'property_city', 'property_area', 'property_pin',
+                                   'property_state', 'property_country']
+                for field in required_fields:
+                    if not item.get(field):
+                        return Response({field: f"{field} is required for House Property asset type."},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                if not buyers_data:
+                    return Response({"buyer_details": "Buyer details are required for House Property asset type."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            elif asset_type == CapitalGains.ListedSharesOrMutualFunds:
+                for field in ['property_door_no', 'property_city', 'property_area', 'property_pin', 'property_state',
+                              'property_country']:
+                    if item.get(field):
+                        return Response(
+                            {field: f"{field} should not be provided for Listed Shares/Mutual Funds asset type."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
             item['income_tax'] = income_tax_profile.id
             item['income_tax_return'] = income_tax_return.id
             serializer = self.get_serializer(data=item)
@@ -393,7 +418,8 @@ class CapitalGainsListCreateApi(generics.ListCreateAPIView):
             updated_data = self.get_serializer(capital_gain).data
             created_records[-1] = updated_data
 
-        return Response({'status': 'success', 'message': 'Capital gains created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
+        return Response({'status': 'success', 'message': 'Capital gains created successfully', 'data': created_records},
+                        status=status.HTTP_201_CREATED)
 
 
 class CapitalGainsUpdateApi(generics.GenericAPIView):
@@ -406,12 +432,30 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
+
         if isinstance(data, dict):
             data = [data]
+
         if isinstance(data, list):
             updated_ids = []
             for item in data:
+                asset_type = item.get('asset_type')
                 buyers_data = item.pop('buyer_details', [])
+
+                if asset_type == CapitalGains.HouseProperty:
+                    required_fields = ['property_door_no', 'property_city', 'property_area', 'property_pin', 'property_state', 'property_country']
+                    for field in required_fields:
+                        if not item.get(field):
+                            return Response({field: f"{field} is required for House Property asset type."}, status=status.HTTP_400_BAD_REQUEST)
+                    if not buyers_data:
+                        return Response({"buyer_details": "Buyer details are required for House Property asset type."}, status=status.HTTP_400_BAD_REQUEST)
+                elif asset_type == CapitalGains.ListedSharesOrMutualFunds:
+                    for field in ['property_door_no', 'property_city', 'property_area', 'property_pin', 'property_state', 'property_country']:
+                        if item.get(field):
+                            return Response({field: f"{field} should not be provided for Listed Shares/Mutual Funds asset type."}, status=status.HTTP_400_BAD_REQUEST)
+
+                item['income_tax'] = income_tax_profile
+                item['income_tax_return'] = income_tax_return
                 capital_gain, created = CapitalGains.objects.update_or_create(
                     income_tax=income_tax_profile,
                     income_tax_return=income_tax_return,
@@ -422,6 +466,7 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
 
                 buyer_ids = []
                 for buyer in buyers_data:
+                    buyer['capital_gains'] = capital_gain
                     buyer_detail, buyer_created = BuyerDetails.objects.update_or_create(
                         capital_gains=capital_gain,
                         id=buyer.get('id'),

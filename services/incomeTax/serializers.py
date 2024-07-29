@@ -243,6 +243,7 @@ class BuyerDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BuyerDetails
         fields = "__all__"
+        extra_kwargs = {'capital_gains': {'required': False}}
 
 
 class CapitalGainsSerializer(serializers.ModelSerializer):
@@ -251,27 +252,6 @@ class CapitalGainsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CapitalGains
         fields = "__all__"
-
-    def __init__(self, *args, **kwargs):
-        super(CapitalGainsSerializer, self).__init__(*args, **kwargs)
-        if 'asset_type' in self.initial_data:
-            asset_type = int(self.initial_data['asset_type'])
-            if asset_type == CapitalGains.HouseProperty:
-                self.fields['property_door_no'].required = True
-                self.fields['property_city'].required = True
-                self.fields['property_area'].required = True
-                self.fields['property_pin'].required = True
-                self.fields['property_state'].required = True
-                self.fields['property_country'].required = True
-                self.fields['buyer_details'].required = True
-            elif asset_type == CapitalGains.ListedSharesOrMutualFunds:
-                self.fields['property_door_no'].required = False
-                self.fields['property_city'].required = False
-                self.fields['property_area'].required = False
-                self.fields['property_pin'].required = False
-                self.fields['property_state'].required = False
-                self.fields['property_country'].required = False
-                self.fields['buyer_details'].required = False
 
     def create(self, validated_data):
         buyer_details_data = validated_data.pop('buyer_details', [])
@@ -283,6 +263,8 @@ class CapitalGainsSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         buyer_details_data = validated_data.pop('buyer_details', [])
         instance = super().update(instance, validated_data)
+
+        # Update or create buyer details
         for buyer_data in buyer_details_data:
             BuyerDetails.objects.update_or_create(
                 capital_gains=instance,
