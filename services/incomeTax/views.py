@@ -275,19 +275,28 @@ class SalaryIncomeUpdateApi(generics.GenericAPIView):
         income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
+
+        data = request.data.getlist('data')
+        files = request.FILES.getlist('files')
+
         if isinstance(data, list):
             updated_ids = []
-            for item in data:
+            for item_data, file in zip(data, files):
+                item_dict = json.loads(item_data)
+                item_dict['income_tax'] = income_tax_profile
+                item_dict['income_tax_return'] = income_tax_return
+                item_dict['upload_form_file'] = file
                 salary_income, created = SalaryIncome.objects.update_or_create(
                     income_tax=income_tax_profile,
                     income_tax_return=income_tax_return,
-                    id=item.get('id'),
-                    defaults=item
+                    id=item_dict.get('id'),
+                    defaults=item_dict
                 )
                 updated_ids.append(salary_income.id)
+
             SalaryIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
                 id__in=updated_ids).delete()
+
             return Response({'status': 'success', 'message': 'Salary incomes updated successfully'},
                             status=status.HTTP_200_OK)
         else:
@@ -397,6 +406,8 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
+        if isinstance(data, dict):
+            data = [data]
         if isinstance(data, list):
             updated_ids = []
             for item in data:
@@ -789,39 +800,45 @@ class TaxPaidApi(generics.GenericAPIView):
         income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
-        data = request.data
 
-        tds_data = data.get('tds_or_tcs_deductions', [])
-        self_assessment_data = data.get('self_assessment_and_advance_tax_paid', [])
+        tds_data = request.data.getlist('tds_or_tcs_deductions', [])
+        self_assessment_data = request.data.getlist('self_assessment_and_advance_tax_paid', [])
+        files = request.FILES.getlist('files')
 
         updated_tds_ids = []
         for item in tds_data:
-            item['income_tax'] = income_tax_profile
-            item['income_tax_return'] = income_tax_return
+            item_dict = json.loads(item)
+            item_dict['income_tax'] = income_tax_profile
+            item_dict['income_tax_return'] = income_tax_return
             tds_or_tcs_deduction, created = TdsOrTcsDeduction.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
-                id=item.get('id'),
-                defaults=item
+                id=item_dict.get('id'),
+                defaults=item_dict
             )
             updated_tds_ids.append(tds_or_tcs_deduction.id)
 
         TdsOrTcsDeduction.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
             id__in=updated_tds_ids).delete()
+
         updated_self_assessment_ids = []
-        for item_data in self_assessment_data:
-            item_data['income_tax'] = income_tax_profile
-            item_data['income_tax_return'] = income_tax_return
+        for item_data, file in zip(self_assessment_data, files):
+            item_data_dict = json.loads(item_data)
+            item_data_dict['income_tax'] = income_tax_profile
+            item_data_dict['income_tax_return'] = income_tax_return
+            item_data_dict['upload_challan'] = file
             self_assessment_and_advance_tax_paid, created = SelfAssesmentAndAdvanceTaxPaid.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
-                id=item_data.get('id'),
-                defaults=item_data
+                id=item_data_dict.get('id'),
+                defaults=item_data_dict
             )
             updated_self_assessment_ids.append(self_assessment_and_advance_tax_paid.id)
+
         SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax=income_tax_profile,
                                                       income_tax_return=income_tax_return).exclude(
             id__in=updated_self_assessment_ids).delete()
+
         return Response({
             'status': 'success',
             'message': 'Records updated successfully',

@@ -170,9 +170,9 @@ class RentalIncome(abstract_models.BaseModel):
     income_tax = models.ForeignKey(IncomeTaxProfile, on_delete=models.CASCADE, related_name='rental_incomes')
     income_tax_return = models.ForeignKey(IncomeTaxReturn, on_delete=models.CASCADE, related_name='rental_incomes')
     occupancy_status = models.IntegerField(choices=OCCUPANCY_TYPE_CHOICES)
-    tenant_name = models.CharField(max_length=255)
-    tenant_aadhar = models.CharField(max_length=255)
-    tenant_pan = models.CharField(max_length=255)
+    tenant_name = models.CharField(max_length=255, blank=True, null=True)
+    tenant_aadhar = models.CharField(max_length=255, blank=True, null=True)
+    tenant_pan = models.CharField(max_length=255, blank=True, null=True)
     property_door_no = models.CharField(max_length=255)
     property_area = models.CharField(max_length=255)
     property_city = models.CharField(max_length=255)
@@ -339,10 +339,16 @@ class InterestIncome(abstract_models.BaseModel):
 
 
 class InterestOnItRefunds(abstract_models.BaseModel):
+    Received, Pending = 1, 2
+    INTEREST_ON_IT_REFUNDS_STATUS_CHOICES = (
+        (Received, 'Received'),
+        (Pending, 'Pending'),
+    )
     income_tax = models.ForeignKey(IncomeTaxProfile, on_delete=models.CASCADE,
                                    related_name='interest_on_it_refunds')
     income_tax_return = models.ForeignKey(IncomeTaxReturn, on_delete=models.CASCADE,
                                           related_name='interest_on_it_refunds')
+    interest_on_it_refunds_status = models.IntegerField(choices=INTEREST_ON_IT_REFUNDS_STATUS_CHOICES, default=2)
     particular = models.CharField(max_length=255)
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=30, decimal_places=2)
