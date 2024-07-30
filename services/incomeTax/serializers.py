@@ -253,6 +253,27 @@ class CapitalGainsSerializer(serializers.ModelSerializer):
         model = CapitalGains
         fields = "__all__"
 
+    def validate(self, data):
+        asset_type = data.get('asset_type')
+        term_type = data.get('term_type', None)
+
+        if asset_type == CapitalGains.HouseProperty:
+            required_fields = ['property_door_no', 'property_city', 'property_area', 'property_pin', 'property_state', 'property_country']
+            for field in required_fields:
+                if not data.get(field):
+                    raise serializers.ValidationError({field: f"{field} is required for House Property asset type."})
+            if 'buyer_details' in data:
+                if not data['buyer_details']:
+                    raise serializers.ValidationError({"buyer_details": "Buyer details are required for House Property asset type."})
+        elif asset_type == CapitalGains.ListedSharesOrMutualFunds:
+            if term_type == CapitalGains.ShortTerm:
+                if data.get('isn_code') is not None or data.get('fair_value_per_unit') is not None:
+                    raise serializers.ValidationError({"isn_code": "ISN Code should not be provided for Short Term.", "fair_value_per_unit": "Fair Value Per Unit should not be provided for Short Term."})
+            elif term_type == CapitalGains.LongTerm:
+                if data.get('no_of_units') is not None:
+                    raise serializers.ValidationError({"no_of_units": "No of Units should not be provided for Long Term."})
+        return data
+
     def create(self, validated_data):
         buyer_details_data = validated_data.pop('buyer_details', [])
         capital_gains = CapitalGains.objects.create(**validated_data)
