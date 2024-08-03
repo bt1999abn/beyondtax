@@ -1,4 +1,7 @@
 import json
+
+from django.db.models import Sum
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
@@ -707,12 +710,14 @@ class OtherIncomesApi(generics.GenericAPIView):
     def patch(self, request, *args, **kwargs):
         user = self.request.user
         income_tax_return_id = self.kwargs['income_tax_return_id']
-        income_tax_profile = IncomeTaxProfile.objects.get(user=user)
-        income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
+        income_tax_profile = get_object_or_404(IncomeTaxProfile, user=user)
+        income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
         data = request.data
 
         updated_records = {}
         interest_incomes_data = data.get('interest_incomes', [])
+        interest_ids = [item.get('id') for item in interest_incomes_data if item.get('id') is not None]
+        InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=interest_ids).delete()
         interest_incomes_updated = []
         for item in interest_incomes_data:
             interest_income, created = InterestIncome.objects.update_or_create(
@@ -723,7 +728,10 @@ class OtherIncomesApi(generics.GenericAPIView):
             )
             interest_incomes_updated.append(InterestIncomeSerializer(interest_income).data)
         updated_records['interest_incomes'] = interest_incomes_updated
+
         interest_on_it_refunds_data = data.get('interest_on_it_refunds', [])
+        it_refund_ids = [item.get('id') for item in interest_on_it_refunds_data if item.get('id') is not None]
+        InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=it_refund_ids).delete()
         interest_on_it_refunds_updated = []
         for item in interest_on_it_refunds_data:
             interest_on_it_refund, created = InterestOnItRefunds.objects.update_or_create(
@@ -735,6 +743,8 @@ class OtherIncomesApi(generics.GenericAPIView):
             interest_on_it_refunds_updated.append(InterestOnItRefundsSerializer(interest_on_it_refund).data)
         updated_records['interest_on_it_refunds'] = interest_on_it_refunds_updated
         dividend_incomes_data = data.get('dividend_incomes', [])
+        dividend_ids = [item.get('id') for item in dividend_incomes_data if item.get('id') is not None]
+        DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=dividend_ids).delete()
         dividend_incomes_updated = []
         for item in dividend_incomes_data:
             dividend_income, created = DividendIncome.objects.update_or_create(
@@ -746,6 +756,8 @@ class OtherIncomesApi(generics.GenericAPIView):
             dividend_incomes_updated.append(DividendIncomeSerializer(dividend_income).data)
         updated_records['dividend_incomes'] = dividend_incomes_updated
         income_from_betting_data = data.get('income_from_betting', [])
+        betting_ids = [item.get('id') for item in income_from_betting_data if item.get('id') is not None]
+        IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=betting_ids).delete()
         income_from_betting_updated = []
         for item in income_from_betting_data:
             income_from_betting, created = IncomeFromBetting.objects.update_or_create(
@@ -756,6 +768,7 @@ class OtherIncomesApi(generics.GenericAPIView):
             )
             income_from_betting_updated.append(IncomeFromBettingSerializer(income_from_betting).data)
         updated_records['income_from_betting'] = income_from_betting_updated
+
         return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records}, status=status.HTTP_200_OK)
 
 
@@ -913,3 +926,67 @@ class DeductionsApi(generics.GenericAPIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TotalIncomeGetAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        income_tax_return_id = self.kwargs['income_tax_return_id']
+
+        income_tax_profile = get_object_or_404(IncomeTaxProfile, user=user)
+        income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
+
+        salary_incomes = SalaryIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_salary_income = salary_incomes.aggregate(total=Sum('gross_salary'))['total'] or 0
+        salary_data = [{'employer_name': item.employer_name, 'gross_salary': item.gross_salary} for item in salary_incomes]
+        is_salary_income_edited = total_salary_income > 0
+
+        rental_incomes = RentalIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_rental_income = rental_incomes.aggregate(total=Sum('net_rental_income'))['total'] or 0
+        rental_data = [{'tenant_name': 'Self-occupied' if item.occupancy_status == RentalIncome.SelfOccupied else item.tenant_name, 'net_rental_income': item.net_rental_income} for item in rental_incomes]
+        is_rental_income_edited = total_rental_income > 0
+
+        capital_gains = CapitalGains.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_capital_gains = capital_gains.aggregate(total=Sum('gain_or_loss'))['total'] or 0
+        is_capital_gains_edited = total_capital_gains > 0
+
+        agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_agriculture_income = agriculture_incomes.aggregate(total=Sum('gross_recipts'))['total'] or 0
+
+        exempt_incomes = ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_exempt_income = exempt_incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        total_agriculture_and_exempt_income = total_agriculture_income + total_exempt_income
+        is_agriculture_and_exempt_income_edited = total_agriculture_and_exempt_income > 0
+
+        interest_incomes = InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_interest_income = interest_incomes.aggregate(total=Sum('interest_amount'))['total'] or 0
+
+        it_refunds = InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_it_refunds = it_refunds.aggregate(total=Sum('amount'))['total'] or 0
+
+        dividend_incomes = DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_dividend_income = dividend_incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        betting_incomes = IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_betting_income = betting_incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        total_others_income = total_interest_income + total_it_refunds + total_dividend_income + total_betting_income
+        is_others_income_edited = total_others_income > 0
+
+        return Response({
+            'total_salary_income': total_salary_income,
+            'salary_details': salary_data,
+            'is_salary_income_edited': is_salary_income_edited,
+            'total_rental_income': total_rental_income,
+            'rental_details': rental_data,
+            'is_rental_income_edited': is_rental_income_edited,
+            'total_capital_gains': total_capital_gains,
+            'is_capital_gains_edited': is_capital_gains_edited,
+            'total_agriculture_and_exempt_income': total_agriculture_and_exempt_income,
+            'is_agriculture_and_exempt_income_edited': is_agriculture_and_exempt_income_edited,
+            'total_others_income': total_others_income,
+            'is_others_income_edited': is_others_income_edited,
+        })
