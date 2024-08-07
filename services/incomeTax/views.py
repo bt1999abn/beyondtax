@@ -952,6 +952,15 @@ class TotalIncomeGetAPIView(generics.GenericAPIView):
         total_capital_gains = capital_gains.aggregate(total=Sum('gain_or_loss'))['total'] or 0
         is_capital_gains_edited = total_capital_gains > 0
 
+        business_incomes = BusinessIncome.objects.filter(income_tax=income_tax_profile,income_tax_return=income_tax_return)
+        total_business_income = business_incomes.aggregate(
+            total=Sum('gross_receipt_cheq_neft_rtgs_profit') + Sum('gross_receipt_cash_upi_profit'))['total'] or 0
+        # business_data = [{'business_name': item.business_name,
+        #                   'gross_receipt_cheq_neft_rtgs_profit': item.gross_receipt_cheq_neft_rtgs_profit,
+        #                   'gross_receipt_cash_upi_profit': item.gross_receipt_cash_upi_profit} for item in
+        #                  business_incomes]
+        is_business_income_edited = total_business_income > 0
+
         agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
         total_agriculture_income = agriculture_incomes.aggregate(total=Sum('gross_recipts'))['total'] or 0
 
@@ -985,8 +994,89 @@ class TotalIncomeGetAPIView(generics.GenericAPIView):
             'is_rental_income_edited': is_rental_income_edited,
             'total_capital_gains': total_capital_gains,
             'is_capital_gains_edited': is_capital_gains_edited,
+            'total_business_income': total_business_income,
+            # 'business_details': business_data,
+            'is_business_income_edited': is_business_income_edited,
             'total_agriculture_and_exempt_income': total_agriculture_and_exempt_income,
             'is_agriculture_and_exempt_income_edited': is_agriculture_and_exempt_income_edited,
             'total_others_income': total_others_income,
             'is_others_income_edited': is_others_income_edited,
+        })
+
+
+class TotalSummaryGetAPI(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        income_tax_return_id = self.kwargs['income_tax_return_id']
+
+        income_tax_profile = get_object_or_404(IncomeTaxProfile, user=user)
+        income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
+
+        income_tax_return_year_name = income_tax_return.income_tax_return_year.name
+
+        salary_incomes = SalaryIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_salary_income = salary_incomes.aggregate(total=Sum('gross_salary'))['total'] or 0
+
+        rental_incomes = RentalIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_rental_income = rental_incomes.aggregate(total=Sum('net_rental_income'))['total'] or 0
+
+        capital_gains = CapitalGains.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_capital_gains = capital_gains.aggregate(total=Sum('gain_or_loss'))['total'] or 0
+
+        agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_agriculture_income = agriculture_incomes.aggregate(total=Sum('gross_recipts'))['total'] or 0
+
+        exempt_incomes = ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_exempt_income = exempt_incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        interest_incomes = InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_interest_income = interest_incomes.aggregate(total=Sum('interest_amount'))['total'] or 0
+
+        it_refunds = InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_it_refunds = it_refunds.aggregate(total=Sum('amount'))['total'] or 0
+
+        dividend_incomes = DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_dividend_income = dividend_incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        betting_incomes = IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_betting_income = betting_incomes.aggregate(total=Sum('amount'))['total'] or 0
+
+        business_incomes = BusinessIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_business_income = business_incomes.aggregate(total=Sum('gross_receipt_cheq_neft_rtgs_profit') + Sum('gross_receipt_cash_upi_profit'))['total'] or 0
+
+        total_income = (total_salary_income + total_rental_income + total_capital_gains +
+                        total_agriculture_income + total_exempt_income + total_interest_income +
+                        total_it_refunds + total_dividend_income + total_betting_income +
+                        total_business_income)
+
+        deductions = get_object_or_404(Deductions, income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_deductions = (
+            deductions.life_insurance + deductions.provident_fund + deductions.elss_mutual_fund +
+            deductions.home_loan_repayment + deductions.tution_fees + deductions.stamp_duty_paid +
+            deductions.others + deductions.contribution_by_self + deductions.contribution_by_employeer +
+            deductions.medical_insurance_self + deductions.medical_preventive_health_checkup_self +
+            deductions.medical_expenditure_self + deductions.medical_insurance_parents +
+            deductions.medical_preventive_health_checkup_parents + deductions.medical_expenditure_parents +
+            deductions.education_loan + deductions.electronic_vehicle_loan + deductions.home_loan_amount +
+            deductions.interest_income + deductions.royality_on_books + deductions.income_on_patients +
+            deductions.income_on_bio_degradable + deductions.rent_paid + deductions.contribution_to_agnipath +
+            deductions.donation_to_political_parties + deductions.donation_others
+        )
+
+        tds_or_tcs_deductions = TdsOrTcsDeduction.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_tds_or_tcs_amount = tds_or_tcs_deductions.aggregate(total=Sum('tds_or_tcs_amount'))['total'] or 0
+
+        self_assessment_taxes = SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        total_self_assessment_amount = self_assessment_taxes.aggregate(total=Sum('amount'))['total'] or 0
+
+        total_taxes_paid = total_tds_or_tcs_amount + total_self_assessment_amount
+
+        return Response({
+            'income_tax_return_year': income_tax_return_year_name,
+            'total_income': total_income,
+            'total_deductions': total_deductions,
+            'total_taxes_paid': total_taxes_paid,
+            'total_tax_refund': 0,
         })

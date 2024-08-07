@@ -4,7 +4,7 @@ from .views import IncomeTaxProfileApi, ListIncomeTaxReturnsView, ResidentialSta
     SalaryIncomeListCreateApi, SalaryIncomeUpdateApi, RentalIncomeListCreateApi, \
     RentalIncomeUpdateApi, CapitalGainsListCreateApi, CapitalGainsUpdateApi, \
     BusinessIncomeListCreateApi, BusinessIncomeUpdateApi, DeductionsApi, AgricultureAndExemptIncomeApi, OtherIncomesApi, \
-    TaxPaidApi, TotalIncomeGetAPIView
+    TaxPaidApi, TotalIncomeGetAPIView, TotalSummaryGetAPI
 
 urlpatterns = [
     path('create-incometax-profile/', IncomeTaxProfileApi.as_view(), name='create-incometax-profile'),
@@ -37,4 +37,5 @@ urlpatterns = [
     path('tax-paid/<int:income_tax_return_id>/', TaxPaidApi.as_view(), name='tax-paid'),
     path('deductions/<int:income_tax_return_id>/', DeductionsApi.as_view(), name='deductions'),
     path('total-income/<int:income_tax_return_id>/', TotalIncomeGetAPIView.as_view(), name='total-income-get-api'),
+    path('total-tax-summary/<int:income_tax_return_id>/', TotalSummaryGetAPI.as_view(), name='total-tax-summary'),
 ]
