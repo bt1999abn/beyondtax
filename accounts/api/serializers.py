@@ -46,7 +46,7 @@ class LoginSerializer(serializers.Serializer):
 
     def get_user(self, obj):
         user = obj.get('user')
-        full_name = f"{user.first_name} {user.last_name}".strip()
+        full_name = f"{user.first_name} {user.last_name or ''}".strip()
         try:
             income_tax_profile = user.income_tax_profile
             pan_no = income_tax_profile.pan_no if income_tax_profile else None
