@@ -1,5 +1,6 @@
+import re
 from datetime import datetime
-
+import fitz
 from django.core.validators import RegexValidator
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
@@ -91,6 +92,11 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         return income_tax_profile, next_question_data
 
     def update(self, instance, validated_data):
+
+        if 'date_of_birth' in validated_data:
+            date_of_birth_str = validated_data.pop('date_of_birth')
+            instance.date_of_birth = self.validate_date_of_birth(date_of_birth_str)
+
         bank_details_data = validated_data.pop('income_tax_bankdetails', [])
         address_data = validated_data.pop('address', None)
         answers_data = validated_data.pop('answers', [])
@@ -352,7 +358,7 @@ class ExemptIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class AgricultureAndExemptIncomeSerializer(serializers.ModelSerializer):
+class AgricultureAndExemptIncomeSerializer(serializers.Serializer):
     agriculture_incomes = AgricultureIncomeSerializer(many=True, required=False)
     exempt_incomes = ExemptIncomeSerializer(many=True, required=False)
 
@@ -408,7 +414,7 @@ class IncomeFromBettingSerializer(serializers.ModelSerializer):
         return instance
 
 
-class OtherIncomesSerializer(serializers.ModelSerializer):
+class OtherIncomesSerializer(serializers.Serializer):
     interest_incomes = InterestIncomeSerializer(many=True, required=False)
     interest_on_it_refunds = InterestOnItRefundsSerializer(many=True, required=False)
     dividend_incomes = DividendIncomeSerializer(many=True, required=False)
@@ -442,7 +448,7 @@ class SelfAssesmentAndAdvanceTaxPaidSerializer(serializers.ModelSerializer):
         return instance
 
 
-class TaxPaidSerializer(serializers.ModelSerializer):
+class TaxPaidSerializer(serializers.Serializer):
     tds_or_tcs_deductions = TdsOrTcsDeductionSerializer(many=True, required=False)
     self_assessment_and_advance_tax_paid = SelfAssesmentAndAdvanceTaxPaidSerializer(many=True, required=False)
 
@@ -460,3 +466,183 @@ class DeductionsSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class AisPdfUploadSerializer(serializers.Serializer):
+    ais_pdf = serializers.FileField()
+
+    def extract_text_from_pdf(self, pdf_file):
+        try:
+            pdf_file.seek(0)
+            doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+            text = ""
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                text += page.get_text("text")
+            return text
+        except Exception as e:
+            print(f"Error extracting text from PDF: {e}")
+            return None
+
+    def extract_data_from_text(self, text):
+        extracted_data = {
+            "salary": [],
+            "rent_received": [],
+            "dividends": [],
+            "business_receipts": [],
+            "interest_income": []
+        }
+
+        patterns = {
+            "salary": re.compile(
+                r"(\d+)\s+TDS-192\s+Salary received.*?\s+([A-Z\s]+ \(.*?\))\s+(\d+)\s+([\d,]+)",
+                re.S
+            ),
+            "rent_received": re.compile(
+                r"(\d+)\s+TDS-194I\(b\)\s+Rent received.*?\s+([A-Z\s]+ \(.*?\))\s+(\d+)\s+([\d,]+)",
+                re.S
+            ),
+            "dividends": re.compile(
+                r"(\d+)\s+TDS-194\[K\]?\s+Dividend received.*?\s+([A-Z\s]+ \(.*?\))\s+(\d+)\s+([\d,]+)",
+                re.S
+            ),
+            "business_receipts": re.compile(
+                r"(\d+)\s+TDS-194J\s+Receipt of fees.*?\s+([A-Z\s]+ \(.*?\))\s+(\d+)\s+([\d,]+)",
+                re.S
+            ),
+            "interest_income": re.compile(
+                r"(\d+)\s+SFT-016\(SB\)\s+Interest income.*?\s+([A-Z\s]+ \(.*?\))\s+(\d+)\s+([\d,]+)",
+                re.S
+            )
+        }
+
+        for key, pattern in patterns.items():
+            matches = pattern.findall(text)
+            for match in matches:
+                extracted_data[key].append({
+                    "sr_no": int(match[0]),
+                    "information_source": match[1],
+                    "amount": match[3].replace(',', '')
+                })
+
+        return extracted_data
+
+    def save_extracted_data(self, extracted_data, income_tax_return):
+        income_tax_profile = income_tax_return.user.income_tax_profile
+        saved_data = {"salary": [], "rent_received": [], "business_receipts": [], "dividends": [], "interest_income": []}
+
+        for item in extracted_data["salary"]:
+            salary_income, _ = SalaryIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                employer_name=item["information_source"],
+                defaults={
+                    "gross_salary": item["amount"],
+                    "employer_category": SalaryIncome.Private,
+                    "tan": "",
+                    "tds_deduction": 0.0,
+                    "income_reported": 0.0,
+                    "upload_form_type": SalaryIncome.Form16,
+                    "upload_form_file": None,
+                    "basic_salary_component": 0.0,
+                    "hra_component": 0.0,
+                    "annual_rent_paid": 0.0,
+                    "do_you_live_in_these_cities": False
+                }
+            )
+            saved_data["salary"].append(salary_income)
+
+        for item in extracted_data["rent_received"]:
+            rental_income, _ = RentalIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                tenant_name=item["information_source"],
+                defaults={
+                    "annual_rent": item["amount"],
+                    "occupancy_status": RentalIncome.LetOut,
+                    "tenant_aadhar": "",
+                    "tenant_pan": "",
+                    "property_door_no": "",
+                    "property_area": "",
+                    "property_city": "",
+                    "property_pincode": "",
+                    "property_state": "",
+                    "property_country": "",
+                    "property_tax_paid": 0.0,
+                    "standard_deduction": 0.0,
+                    "interest_on_home_loan_dcp": 0.0,
+                    "interest_on_home_loan_pc": 0.0,
+                    "net_rental_income": 0.0,
+                    "ownership_percent": 100
+                }
+            )
+            saved_data["rent_received"].append(rental_income)
+
+        for item in extracted_data["business_receipts"]:
+            business_income, _ = BusinessIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                business_name=item["information_source"],
+                defaults={
+                    "gross_receipt_cheq_neft_rtgs_turnover": item["amount"],
+                    "business_income_type": "44AD",
+                    "industry": BusinessIncome.ITServices,
+                    "nature_of_business": "",
+                    "description": "",
+                    "gross_receipt_cheq_neft_rtgs_profit": 0.0,
+                    "gross_receipt_cash_upi_turnover": 0.0,
+                    "gross_receipt_cash_upi_profit": 0.0,
+                    "fixed_asset": 0.0,
+                    "inventory": 0.0,
+                    "receivebles": 0.0,
+                    "loans_and_advances": 0.0,
+                    "investments": 0.0,
+                    "cash_in_hand": 0.0,
+                    "bank_balance": 0.0,
+                    "other_assets": 0.0,
+                    "capital": 0.0,
+                    "secured_loans": 0.0,
+                    "payables": 0.0,
+                    "unsecured_loans": 0.0,
+                    "advances": 0.0,
+                    "other_liabilities": 0.0
+                }
+            )
+            saved_data["business_receipts"].append(business_income)
+
+        for item in extracted_data["dividends"]:
+            dividend_income, _ = DividendIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                particular=item["information_source"],
+                defaults={
+                    "amount": item["amount"],
+                    "description": ""
+                }
+            )
+            saved_data["dividends"].append(dividend_income)
+
+        for item in extracted_data["interest_income"]:
+            interest_income, _ = InterestIncome.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                description=item["information_source"],
+                defaults={
+                    "interest_amount": item["amount"],
+                    "interest_income_type": InterestIncome.SavingsBankAccount
+                }
+            )
+            saved_data["interest_income"].append(interest_income)
+
+        return saved_data
+
+    def save(self):
+        ais_pdf = self.validated_data.get('ais_pdf')
+        income_tax_return = self.context['income_tax_return']
+
+        pdf_text = self.extract_text_from_pdf(ais_pdf)
+        if not pdf_text:
+            raise serializers.ValidationError("Unable to extract text from the uploaded AIS file.")
+
+        extracted_data = self.extract_data_from_text(pdf_text)
+        return self.save_extracted_data(extracted_data, income_tax_return)

@@ -4,7 +4,7 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics
+from rest_framework import status, generics, serializers
 from rest_framework.permissions import IsAuthenticated
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, \
     ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress, SalaryIncome, RentalIncome, BuyerDetails, \
@@ -15,7 +15,8 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     CapitalGainsSerializer, BusinessIncomeSerializer, AgricultureIncomeSerializer, InterestIncomeSerializer, \
     InterestOnItRefundsSerializer, DividendIncomeSerializer, IncomeFromBettingSerializer, TdsOrTcsDeductionSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
-    LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer
+    LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer, \
+    AisPdfUploadSerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
@@ -1080,3 +1081,31 @@ class TotalSummaryGetAPI(generics.GenericAPIView):
             'total_taxes_paid': total_taxes_paid,
             'total_tax_refund': 0,
         })
+
+
+class AisPdfUploadApi(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AisPdfUploadSerializer
+
+    def post(self, request, *args, **kwargs):
+        income_tax_return_id = kwargs.get('income_tax_return_id')
+
+        try:
+            income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=request.user)
+        except IncomeTaxReturn.DoesNotExist:
+            return Response({"error": "IncomeTaxReturn not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.context['income_tax_return'] = income_tax_return
+        saved_data = serializer.save()
+
+        response_data = {
+            "salary": SalaryIncomeSerializer(saved_data["salary"], many=True).data,
+            "rent_received": RentalIncomeSerializer(saved_data["rent_received"], many=True).data,
+            "business_receipts": BusinessIncomeSerializer(saved_data["business_receipts"], many=True).data,
+            "dividends": DividendIncomeSerializer(saved_data["dividends"], many=True).data,
+            "interest_income": InterestIncomeSerializer(saved_data["interest_income"], many=True).data
+        }
+
+        return Response({"message": "Data processed successfully", "data": response_data}, status=status.HTTP_200_OK)
