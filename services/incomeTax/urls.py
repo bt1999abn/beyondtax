@@ -4,7 +4,7 @@ from .views import IncomeTaxProfileApi, ListIncomeTaxReturnsView, ResidentialSta
     SalaryIncomeListCreateApi, SalaryIncomeUpdateApi, RentalIncomeListCreateApi, \
     RentalIncomeUpdateApi, CapitalGainsListCreateApi, CapitalGainsUpdateApi, \
     BusinessIncomeListCreateApi, BusinessIncomeUpdateApi, DeductionsApi, AgricultureAndExemptIncomeApi, OtherIncomesApi, \
-    AisPdfUploadApi, TaxPaidApi, TotalIncomeGetAPIView, TotalSummaryGetAPI
+    AisPdfUploadApi, TaxPaidApi, TotalIncomeGetAPIView, TotalSummaryGetAPI, TdsPdfUploadApi
 
 urlpatterns = [
     path('create-incometax-profile/', IncomeTaxProfileApi.as_view(), name='create-incometax-profile'),
@@ -39,4 +39,5 @@ urlpatterns = [
     path('total-income/<int:income_tax_return_id>/', TotalIncomeGetAPIView.as_view(), name='total-income-get-api'),
     path('total-tax-summary/<int:income_tax_return_id>/', TotalSummaryGetAPI.as_view(), name='total-tax-summary'),
     path('upload-ais-pdf/<int:income_tax_return_id>/', AisPdfUploadApi.as_view(), name='upload-ais-pdf'),
+    path('upload-26as-pdf/<int:income_tax_return_id>/', TdsPdfUploadApi.as_view(), name='upload-ais-pdf'),
 ]

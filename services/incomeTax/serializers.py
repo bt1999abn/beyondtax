@@ -646,3 +646,75 @@ class AisPdfUploadSerializer(serializers.Serializer):
 
         extracted_data = self.extract_data_from_text(pdf_text)
         return self.save_extracted_data(extracted_data, income_tax_return)
+
+
+class TdsPdfSerializer(serializers.Serializer):
+    tds_pdf = serializers.FileField()
+
+    def validate(self, data):
+        income_tax_return_id = self.context['income_tax_return_id']
+        try:
+            income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=self.context['request'].user)
+        except IncomeTaxReturn.DoesNotExist:
+            raise serializers.ValidationError("IncomeTaxReturn not found")
+        data['income_tax_return'] = income_tax_return
+        return data
+
+    def create(self, validated_data):
+        tds_pdf = validated_data.get('tds_pdf')
+        income_tax_return = validated_data.get('income_tax_return')
+        income_tax_profile = income_tax_return.user.income_tax_profile
+        extracted_data = self.extract_tds_details_from_pdf(tds_pdf)
+        saved_records = []
+        for item in extracted_data:
+            tds_or_tcs, _ = TdsOrTcsDeduction.objects.update_or_create(
+                income_tax=income_tax_profile,
+                income_tax_return=income_tax_return,
+                name_of_deductor=item['name_of_deductor'],
+                tan=item['tan'],
+                defaults={
+                    "gross_receipts": item['gross_receipts'],
+                    "tds_or_tcs_amount": item['tds_or_tcs_amount'],
+                    "section": item['section']
+                }
+            )
+            saved_records.append(tds_or_tcs)
+        return saved_records
+
+    def extract_tds_details_from_pdf(self, pdf_file):
+        try:
+            pdf_file.seek(0)
+            doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+            extracted_data = []
+            last_section = None
+            pattern_details = re.compile(
+                r"(\d+)\s+([A-Z\s]+)\s+([A-Z0-9]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)",
+                re.S
+            )
+            pattern_section = re.compile(
+                r"Section\s+(\d+)"
+            )
+
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                text = page.get_text("text")
+
+                matches_section = pattern_section.findall(text)
+                if matches_section:
+                    last_section = matches_section[0]
+
+                matches_details = pattern_details.findall(text)
+                for match in matches_details:
+                    extracted_data.append({
+                        "name_of_deductor": match[1].strip(),
+                        "tan": match[2].strip(),
+                        "gross_receipts": match[3].replace(',', ''),
+                        "tds_or_tcs_amount": match[4].replace(',', ''),
+                        "section": last_section,
+                    })
+
+            return extracted_data
+
+        except Exception as e:
+            print(f"Error extracting data from PDF: {e}")
+            return []

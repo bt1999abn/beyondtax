@@ -1,5 +1,4 @@
 import json
-
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
@@ -16,7 +15,7 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     InterestOnItRefundsSerializer, DividendIncomeSerializer, IncomeFromBettingSerializer, TdsOrTcsDeductionSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
     LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer, \
-    AisPdfUploadSerializer
+    AisPdfUploadSerializer, TdsPdfSerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
@@ -1109,3 +1108,20 @@ class AisPdfUploadApi(generics.CreateAPIView):
         }
 
         return Response({"message": "Data processed successfully", "data": response_data}, status=status.HTTP_200_OK)
+
+
+class TdsPdfUploadApi(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TdsPdfSerializer
+
+    def create(self, request, *args, **kwargs):
+        income_tax_return_id = kwargs.get('income_tax_return_id')
+        serializer = self.get_serializer(data=request.data, context={'request': request, 'income_tax_return_id': income_tax_return_id})
+        serializer.is_valid(raise_exception=True)
+        saved_records = serializer.save()
+        response_serializer = TdsOrTcsDeductionSerializer(saved_records, many=True)
+        return Response({
+            "message": "Data processed successfully",
+            "data": response_serializer.data
+        }, status=status.HTTP_200_OK)
+

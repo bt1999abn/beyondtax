@@ -188,6 +188,14 @@ class RentalIncome(abstract_models.BaseModel):
     net_rental_income = models.DecimalField(max_digits=30, decimal_places=2)
     ownership_percent = models.IntegerField()
 
+    def save(self, *args, **kwargs):
+        self.standard_deduction = (self.annual_rent - self.property_tax_paid) * 0.3
+        self.net_rental_income = (
+                self.annual_rent - self.property_tax_paid - self.standard_deduction -
+                self.interest_on_home_loan_dcp - self.interest_on_home_loan_pc
+        )
+        super(RentalIncome, self).save(*args, **kwargs)
+
 
 class CapitalGains(abstract_models.BaseModel):
     HouseProperty, ListedSharesOrMutualFunds = 1, 2
@@ -426,6 +434,7 @@ class TdsOrTcsDeduction(abstract_models.BaseModel):
     tan = models.CharField(max_length=255)
     tds_or_tcs_amount = models.DecimalField(max_digits=30, decimal_places=2)
     gross_receipts = models.DecimalField(max_digits=30, decimal_places=2)
+    section = models.CharField(max_length=10, blank=True, null=True)
 
 
 class SelfAssesmentAndAdvanceTaxPaid(abstract_models.BaseModel):
