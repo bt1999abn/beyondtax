@@ -446,6 +446,6 @@ class SelfAssesmentAndAdvanceTaxPaid(abstract_models.BaseModel):
     challan_no = models.CharField(max_length=255)
     date = models.DateField()
     amount = models.DecimalField(max_digits=30, decimal_places=2)
-    upload_challan = models.FileField(upload_to='tax_paid_challan_document_files/')
+    challan_pdf = models.FileField(upload_to='tax_paid_challan_document_files/')
 
 

@@ -1,4 +1,7 @@
 import json
+import re
+from datetime import datetime
+import fitz
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
@@ -15,7 +18,7 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     InterestOnItRefundsSerializer, DividendIncomeSerializer, IncomeFromBettingSerializer, TdsOrTcsDeductionSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
     LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer, \
-    AisPdfUploadSerializer, TdsPdfSerializer
+    TdsPdfSerializer, ChallanPdfUploadSerializer, AISPdfUploadSerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
@@ -142,6 +145,8 @@ class VerifyPanOtpApi(APIView):
     def post(self, request, *args, **kwargs):
         otp_id = request.data.get('otp_id')
         otp = request.data.get('otp')
+        new_pan_number = request.data.get('new_pan_number')
+
         if not otp:
             return Response({'status': 'error', 'message': 'OTP is a required field'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -150,6 +155,11 @@ class VerifyPanOtpApi(APIView):
             user = request.user
             income_tax_profile = user.income_tax_profile
             if income_tax_profile:
+                if new_pan_number:
+                    if IncomeTaxProfile.objects.filter(pan_no=new_pan_number).exists():
+                        return Response({'status': 'error', 'message': 'This PAN number is already in use'}, status=status.HTTP_400_BAD_REQUEST)
+                    income_tax_profile.pan_no = new_pan_number
+
                 income_tax_profile.is_pan_verified = True
                 income_tax_profile.save()
 
@@ -171,8 +181,9 @@ class VerifyPanOtpApi(APIView):
                 'status_text': 'OK',
                 'data': {
                     'status': 'success',
-                    'message': 'PAN OTP verification successful and tax return record created',
-                    'is_pan_verified': income_tax_profile.is_pan_verified
+                    'message': 'PAN OTP verification successful and PAN updated',
+                    'is_pan_verified': income_tax_profile.is_pan_verified,
+                    'new_pan_number': income_tax_profile.pan_no
                 }
             }, status=status.HTTP_200_OK)
         else:
@@ -1082,9 +1093,9 @@ class TotalSummaryGetAPI(generics.GenericAPIView):
         })
 
 
-class AisPdfUploadApi(generics.CreateAPIView):
+class AISPdfUploadApi(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = AisPdfUploadSerializer
+    serializer_class = AISPdfUploadSerializer
 
     def post(self, request, *args, **kwargs):
         income_tax_return_id = kwargs.get('income_tax_return_id')
@@ -1125,3 +1136,43 @@ class TdsPdfUploadApi(generics.CreateAPIView):
             "data": response_serializer.data
         }, status=status.HTTP_200_OK)
 
+
+class ChallanUploadApi(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChallanPdfUploadSerializer
+
+    def post(self, request, *args, **kwargs):
+        income_tax_return_id = kwargs.get('income_tax_return_id')
+
+        try:
+            income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=request.user)
+        except IncomeTaxReturn.DoesNotExist:
+            return Response({"error": "IncomeTaxReturn not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.context['income_tax_return'] = income_tax_return
+        saved_data = serializer.save()
+
+        return Response({"message": "Data processed successfully", "data": saved_data}, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        income_tax_return_id = kwargs.get('income_tax_return_id')
+        challan_id = request.data.get('id')
+
+        try:
+            income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=request.user)
+        except IncomeTaxReturn.DoesNotExist:
+            return Response({"error": "IncomeTaxReturn not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            challan_instance = SelfAssesmentAndAdvanceTaxPaid.objects.get(id=challan_id, income_tax_return=income_tax_return)
+        except SelfAssesmentAndAdvanceTaxPaid.DoesNotExist:
+            return Response({"error": "Challan record not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.context['income_tax_return'] = income_tax_return
+        updated_data = serializer.update(instance=challan_instance, validated_data=request.data)
+
+        return Response({"message": "Data updated successfully", "data": updated_data}, status=status.HTTP_200_OK)
