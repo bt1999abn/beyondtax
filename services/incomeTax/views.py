@@ -4,6 +4,7 @@ from datetime import datetime
 import fitz
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics, serializers
@@ -35,28 +36,9 @@ class IncomeTaxProfileApi(APIView):
             profile_serializer = IncomeTaxProfileSerializer(data=request.data, context={'request': request})
 
         if profile_serializer.is_valid():
-            profile, next_question_data = profile_serializer.save()
-            response_serializer = IncomeTaxProfileSerializer(profile, context={'request': request})
-            response_data = response_serializer.data
-            response_data['next_question'] = next_question_data
-
-            if next_question_data and "id" in next_question_data:
-                return Response({
-                    "status_code": 200,
-                    "status_text": "OK",
-                    "data": response_data
-                }, status=status.HTTP_200_OK)
-
-            return Response({
-                "status_code": 201,
-                "status_text": "Created",
-                "data": response_data
-            }, status=status.HTTP_201_CREATED)
-        return Response({
-            "status_code": 400,
-            "status_text": "Bad Request",
-            "errors": profile_serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            profile = profile_serializer.save()
+            return Response(IncomeTaxProfileSerializer(profile, context={'request': request}).data, status=status.HTTP_201_CREATED)
+        return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request):
         try:
@@ -66,8 +48,8 @@ class IncomeTaxProfileApi(APIView):
 
         serializer = IncomeTaxProfileSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            profile = serializer.save()
+            return Response(IncomeTaxProfileSerializer(profile).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request):
@@ -1020,49 +1002,30 @@ class TotalSummaryGetAPI(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
-
-        income_tax_profile = get_object_or_404(IncomeTaxProfile, user=user)
+        income_tax_return_id = self.kwargs.get('income_tax_return_id')
         income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
+        income_tax_profile = income_tax_return.user.income_tax_profile
 
-        income_tax_return_year_name = income_tax_return.income_tax_return_year.name
+        total_salary_income = SalaryIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gross_salary'))['total'] or 0
+        total_rental_income = RentalIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('net_rental_income'))['total'] or 0
+        total_capital_gains = CapitalGains.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gain_or_loss'))['total'] or 0
+        total_agriculture_income = AgricultureIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gross_recipts'))['total'] or 0
+        total_exempt_income = ExemptIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_interest_income = InterestIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('interest_amount'))['total'] or 0
+        total_it_refunds = InterestOnItRefunds.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_dividend_income = DividendIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_betting_income = IncomeFromBetting.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_business_income = BusinessIncome.objects.filter(income_tax_return=income_tax_return).aggregate(
+            total=Sum('gross_receipt_cheq_neft_rtgs_profit') + Sum('gross_receipt_cash_upi_profit'))['total'] or 0
 
-        salary_incomes = SalaryIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_salary_income = salary_incomes.aggregate(total=Sum('gross_salary'))['total'] or 0
+        total_income = (
+            total_salary_income + total_rental_income + total_capital_gains +
+            total_agriculture_income + total_exempt_income + total_interest_income +
+            total_it_refunds + total_dividend_income + total_betting_income +
+            total_business_income
+        )
 
-        rental_incomes = RentalIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_rental_income = rental_incomes.aggregate(total=Sum('net_rental_income'))['total'] or 0
-
-        capital_gains = CapitalGains.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_capital_gains = capital_gains.aggregate(total=Sum('gain_or_loss'))['total'] or 0
-
-        agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_agriculture_income = agriculture_incomes.aggregate(total=Sum('gross_recipts'))['total'] or 0
-
-        exempt_incomes = ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_exempt_income = exempt_incomes.aggregate(total=Sum('amount'))['total'] or 0
-
-        interest_incomes = InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_interest_income = interest_incomes.aggregate(total=Sum('interest_amount'))['total'] or 0
-
-        it_refunds = InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_it_refunds = it_refunds.aggregate(total=Sum('amount'))['total'] or 0
-
-        dividend_incomes = DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_dividend_income = dividend_incomes.aggregate(total=Sum('amount'))['total'] or 0
-
-        betting_incomes = IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_betting_income = betting_incomes.aggregate(total=Sum('amount'))['total'] or 0
-
-        business_incomes = BusinessIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_business_income = business_incomes.aggregate(total=Sum('gross_receipt_cheq_neft_rtgs_profit') + Sum('gross_receipt_cash_upi_profit'))['total'] or 0
-
-        total_income = (total_salary_income + total_rental_income + total_capital_gains +
-                        total_agriculture_income + total_exempt_income + total_interest_income +
-                        total_it_refunds + total_dividend_income + total_betting_income +
-                        total_business_income)
-
-        deductions = get_object_or_404(Deductions, income_tax=income_tax_profile, income_tax_return=income_tax_return)
+        deductions = Deductions.objects.filter(income_tax_return=income_tax_return).first()
         total_deductions = (
             deductions.life_insurance + deductions.provident_fund + deductions.elss_mutual_fund +
             deductions.home_loan_repayment + deductions.tution_fees + deductions.stamp_duty_paid +
@@ -1074,23 +1037,19 @@ class TotalSummaryGetAPI(generics.GenericAPIView):
             deductions.interest_income + deductions.royality_on_books + deductions.income_on_patients +
             deductions.income_on_bio_degradable + deductions.rent_paid + deductions.contribution_to_agnipath +
             deductions.donation_to_political_parties + deductions.donation_others
-        )
+        ) if deductions else 0
 
-        tds_or_tcs_deductions = TdsOrTcsDeduction.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_tds_or_tcs_amount = tds_or_tcs_deductions.aggregate(total=Sum('tds_or_tcs_amount'))['total'] or 0
-
-        self_assessment_taxes = SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-        total_self_assessment_amount = self_assessment_taxes.aggregate(total=Sum('amount'))['total'] or 0
-
+        total_tds_or_tcs_amount = TdsOrTcsDeduction.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('tds_or_tcs_amount'))['total'] or 0
+        total_self_assessment_amount = SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
         total_taxes_paid = total_tds_or_tcs_amount + total_self_assessment_amount
 
         return Response({
-            'income_tax_return_year': income_tax_return_year_name,
+            'income_tax_return_year': income_tax_return.income_tax_return_year.name,
             'total_income': total_income,
             'total_deductions': total_deductions,
             'total_taxes_paid': total_taxes_paid,
             'total_tax_refund': 0,
-        })
+        }, status=status.HTTP_200_OK)
 
 
 class AISPdfUploadApi(generics.CreateAPIView):
