@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.hashers import make_password
@@ -194,26 +194,35 @@ class UpcomingDueDatesApi(generics.ListAPIView):
         )
 
 
-class UpcomingDueDatesByMonthApi(APIView):
+class UpcomingDueDatesByMonthApi(generics.ListAPIView):
+    serializer_class = UpcomingDueDateSerializer
+
+    def get_queryset(self):
+        return UpcomingDueDates.objects.all()
+
     def get(self, request, *args, **kwargs):
-        due_dates = UpcomingDueDates.objects.all()
-        serializer = UpcomingDueDateSerializer(due_dates, many=True)
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
 
         grouped_by_month = defaultdict(list)
+
         for due_date in serializer.data:
             if 'formatted_date' in due_date:
                 due_date_obj = datetime.strptime(due_date['formatted_date'], '%d-%m-%Y')
-                month_key = due_date_obj.strftime('%B %Y')
+                month_key = due_date_obj.strftime('%B').lower()
                 grouped_by_month[month_key].append(due_date)
 
-        response_data = []
-        for month, due_dates in grouped_by_month.items():
-            response_data.append({
-                'month': month,
-                'due_dates': due_dates
-            })
+        month_order = [
+            'january', 'february', 'march', 'april', 'may', 'june',
+            'july', 'august', 'september', 'october', 'november', 'december'
+        ]
 
-        return Response(response_data)
+        ordered_response = {}
+        for month in month_order:
+            if grouped_by_month[month]:
+                ordered_response[month] = grouped_by_month[month]
+
+        return Response(ordered_response, status=status.HTTP_200_OK)
 
 
 class SendEmailOtpApi(APIView):

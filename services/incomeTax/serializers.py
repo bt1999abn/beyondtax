@@ -47,7 +47,7 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
     income_tax_bankdetails = IncomeTaxBankDetailsSerializer(many=True, required=False)
     address = IncomeTaxAddressSerializer(required=False)
     answers = ResidentialStatusAnswerSerializer(many=True, required=False)
-    date_of_birth = serializers.CharField(required=True)
+    date_of_birth = serializers.DateField(required=True)
     mobile_number = serializers.CharField(validators=[RegexValidator(
         regex=r'^([1-9][0-9]{9})$', message="Enter a valid mobile number"
     )])
@@ -92,11 +92,6 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         return income_tax_profile, next_question_data
 
     def update(self, instance, validated_data):
-
-        if 'date_of_birth' in validated_data:
-            date_of_birth_str = validated_data.pop('date_of_birth')
-            instance.date_of_birth = self.validate_date_of_birth(date_of_birth_str)
-
         bank_details_data = validated_data.pop('income_tax_bankdetails', [])
         address_data = validated_data.pop('address', None)
         answers_data = validated_data.pop('answers', [])
@@ -468,13 +463,15 @@ class DeductionsSerializer(serializers.ModelSerializer):
         return instance
 
 
-class AisPdfUploadSerializer(serializers.Serializer):
+class AISPdfUploadSerializer(serializers.Serializer):
     ais_pdf = serializers.FileField()
 
-    def extract_text_from_pdf(self, pdf_file):
+    def extract_text_from_pdf(self, pdf_file, password):
         try:
             pdf_file.seek(0)
             doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+            if not doc.authenticate(password):
+                raise Exception("Invalid password for PDF document")
             text = ""
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
@@ -569,10 +566,8 @@ class AisPdfUploadSerializer(serializers.Serializer):
                     "property_state": "",
                     "property_country": "",
                     "property_tax_paid": 0.0,
-                    "standard_deduction": 0.0,
                     "interest_on_home_loan_dcp": 0.0,
                     "interest_on_home_loan_pc": 0.0,
-                    "net_rental_income": 0.0,
                     "ownership_percent": 100
                 }
             )
@@ -639,8 +634,10 @@ class AisPdfUploadSerializer(serializers.Serializer):
     def save(self):
         ais_pdf = self.validated_data.get('ais_pdf')
         income_tax_return = self.context['income_tax_return']
-
-        pdf_text = self.extract_text_from_pdf(ais_pdf)
+        pan_no = income_tax_return.user.income_tax_profile.pan_no
+        date_of_birth = income_tax_return.user.income_tax_profile.date_of_birth.strftime('%d%m%Y')
+        password = f"{pan_no.lower()}{date_of_birth}"
+        pdf_text = self.extract_text_from_pdf(ais_pdf, password)
         if not pdf_text:
             raise serializers.ValidationError("Unable to extract text from the uploaded AIS file.")
 
@@ -664,7 +661,10 @@ class TdsPdfSerializer(serializers.Serializer):
         tds_pdf = validated_data.get('tds_pdf')
         income_tax_return = validated_data.get('income_tax_return')
         income_tax_profile = income_tax_return.user.income_tax_profile
-        extracted_data = self.extract_tds_details_from_pdf(tds_pdf)
+        pan_number = income_tax_profile.pan_no.lower()
+        date_of_birth = income_tax_profile.date_of_birth.strftime("%d%m%Y")
+        pdf_password = f"{pan_number}{date_of_birth}"
+        extracted_data = self.extract_tds_details_from_pdf(tds_pdf, pdf_password)
         saved_records = []
         for item in extracted_data:
             tds_or_tcs, _ = TdsOrTcsDeduction.objects.update_or_create(
@@ -681,10 +681,12 @@ class TdsPdfSerializer(serializers.Serializer):
             saved_records.append(tds_or_tcs)
         return saved_records
 
-    def extract_tds_details_from_pdf(self, pdf_file):
+    def extract_tds_details_from_pdf(self, pdf_file, password):
         try:
             pdf_file.seek(0)
             doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+            if not doc.authenticate(password):
+                raise Exception("Invalid password for PDF document")
             extracted_data = []
             last_section = None
             pattern_details = re.compile(
@@ -718,3 +720,88 @@ class TdsPdfSerializer(serializers.Serializer):
         except Exception as e:
             print(f"Error extracting data from PDF: {e}")
             return []
+
+
+class ChallanPdfUploadSerializer(serializers.Serializer):
+    challan_pdf = serializers.FileField()
+
+    def extract_challan_details_from_pdf(self, pdf_file):
+        try:
+            pdf_file.seek(0)
+            doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+            text = ""
+            for page_num in range(len(doc)):
+                page = doc.load_page(page_num)
+                text += page.get_text("text")
+
+            pattern_bsr_code = re.compile(r"BSR code\s*:\s*(\d+)")
+            pattern_challan_no = re.compile(r"Challan No\s*:\s*(\d+)")
+            pattern_date_of_deposit = re.compile(r"Date of Deposit\s*:\s*(\d{2}-[A-Za-z]{3}-\d{4})")
+            pattern_amount = re.compile(r"Amount \(in Rs\.\)\s*:\s*₹\s*([\d,]+)")
+
+            bsr_code = pattern_bsr_code.search(text)
+            challan_no = pattern_challan_no.search(text)
+            date_of_deposit = pattern_date_of_deposit.search(text)
+            amount = pattern_amount.search(text)
+
+            if bsr_code and challan_no and date_of_deposit and amount:
+                extracted_data = {
+                    "bsr_code": bsr_code.group(1),
+                    "challan_no": challan_no.group(1),
+                    "date_of_deposit": datetime.strptime(date_of_deposit.group(1), "%d-%b-%Y").date(),
+                    "amount": amount.group(1).replace(',', '')
+                }
+                return extracted_data
+            else:
+                raise serializers.ValidationError("Failed to extract all required data from the PDF.")
+        except Exception as e:
+            print(f"Error extracting data from PDF: {e}")
+            raise serializers.ValidationError("Failed to extract data from PDF.")
+
+    def save_extracted_data(self, extracted_data, income_tax_return, challan_pdf):
+        income_tax_profile = income_tax_return.user.income_tax_profile
+        saved_record = SelfAssesmentAndAdvanceTaxPaid.objects.create(
+            income_tax=income_tax_profile,
+            income_tax_return=income_tax_return,
+            bsr_code=extracted_data["bsr_code"],
+            challan_no=extracted_data["challan_no"],
+            date=extracted_data["date_of_deposit"],
+            amount=extracted_data["amount"],
+            challan_pdf=challan_pdf
+        )
+        response_data = {
+            "id": saved_record.id,
+            "bsr_code": saved_record.bsr_code,
+            "challan_no": saved_record.challan_no,
+            "date_of_deposit": saved_record.date.strftime("%d-%b-%Y"),
+            "amount": saved_record.amount,
+        }
+        return response_data
+
+    def update_extracted_data(self, instance, extracted_data, challan_pdf):
+        instance.bsr_code = extracted_data["bsr_code"]
+        instance.challan_no = extracted_data["challan_no"]
+        instance.date = extracted_data["date_of_deposit"]
+        instance.amount = extracted_data["amount"]
+        instance.challan_pdf = challan_pdf
+        instance.save()
+
+        response_data = {
+            "id": instance.id,
+            "bsr_code": instance.bsr_code,
+            "challan_no": instance.challan_no,
+            "date_of_deposit": instance.date.strftime("%d-%b-%Y"),
+            "amount": instance.amount,
+        }
+        return response_data
+
+    def create(self, validated_data):
+        challan_pdf = validated_data.get('challan_pdf')
+        income_tax_return = self.context.get('income_tax_return')
+        extracted_data = self.extract_challan_details_from_pdf(challan_pdf)
+        return self.save_extracted_data(extracted_data, income_tax_return, challan_pdf)
+
+    def update(self, instance, validated_data):
+        challan_pdf = validated_data.get('challan_pdf')
+        extracted_data = self.extract_challan_details_from_pdf(challan_pdf)
+        return self.update_extracted_data(instance, extracted_data, challan_pdf)
