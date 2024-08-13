@@ -58,7 +58,7 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
             'id', 'first_name', 'middle_name', 'last_name', 'date_of_birth', 'fathers_name',
             'gender', 'marital_status', 'aadhar_no', 'aadhar_enrollment_no', 'pan_no', 'mobile_number',
             'email', 'residential_status', 'income_tax_bankdetails', 'address', 'answers', 'created_at', 'updated_at',
-
+            'is_pan_verified', 'is_data_imported'
         ]
 
     def validate(self, data):
@@ -77,29 +77,19 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError("Invalid type for date_of_birth")
 
-    def create(self, validated_data):
-        user = self.context['request'].user
-        bank_details_data = validated_data.pop('income_tax_bankdetails', [])
-        address_data = validated_data.pop('address', None)
-        answers_data = validated_data.pop('answers', [])
-
-        income_tax_profile = IncomeTaxProfile.objects.create(user=user, **validated_data)
-        for bank_detail_data in bank_details_data:
-            IncomeTaxBankDetails.objects.create(income_tax=income_tax_profile, **bank_detail_data)
-        if address_data:
-            IncomeTaxAddress.objects.create(income_tax=income_tax_profile, **address_data)
-        for answer_data in answers_data:
-            ResidentialStatusAnswer.objects.create(income_tax=income_tax_profile, **answer_data)
-        return income_tax_profile
-
     def update(self, instance, validated_data):
+
+        if 'pan_no' in validated_data and validated_data['pan_no'] != instance.pan_no:
+            validated_data['is_pan_verified'] = False
+            validated_data['is_data_imported'] = False
+
         bank_details_data = validated_data.pop('income_tax_bankdetails', [])
         address_data = validated_data.pop('address', None)
         answers_data = validated_data.pop('answers', [])
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
         if address_data:
             if hasattr(instance, 'address'):
                 address_instance = instance.address

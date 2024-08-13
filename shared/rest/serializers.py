@@ -1,5 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from rest_framework.relations import RelatedField
 
 from shared.libs.hashing import AlphaId
 from django.db import models
@@ -14,10 +16,31 @@ from rest_framework.fields import (  # NOQA # isort:skip
 
 class EncodeAlphaID:
     def get_id(self, instance):
-        return AlphaId.encode(instance.id)
+        id_ = ""
+        if type(instance) is dict:
+            if "id" in instance:
+                id_ = AlphaId.encode(instance["id"])
+        else:
+            id_ = AlphaId.encode(instance.id)
+        return id_
 
 
-class DecodeIdField(serializers.IntegerField):
+class EncodeIdField(serializers.CharField):
+    def to_representation(self, value):
+        value = super().to_representation(value)
+        value = AlphaId.encode(value)
+        return value
+
+    def to_internal_value(self, data):
+        if type(data) is not str:
+            raise serializers.ValidationError("The given id is invalid.")
+        decoded_value = AlphaId.decode(data)
+        if type(decoded_value) is not int or decoded_value < 0:
+            raise serializers.ValidationError("The given id is invalid.")
+        return super().to_internal_value(decoded_value)
+
+
+class DecodeIdField(serializers.CharField):
     def to_internal_value(self, data):
         if type(data) is not str:
             raise serializers.ValidationError("The given id is invalid.")
@@ -66,7 +89,46 @@ class CreatableSlugRelatedField(serializers.SlugRelatedField):
             self.fail('invalid')
 
 
-class BaseModelSerializer(serializers.ModelSerializer):
+class StringPrimaryKeyRelatedField(RelatedField):
+    default_error_messages = {
+        'required': _('This field is required.'),
+        'does_not_exist': _('Invalid pk "{pk_value}" - object does not exist.'),
+        'incorrect_type': _('Incorrect type. Expected pk value, received {data_type}.'),
+    }
+
+    def __init__(self, **kwargs):
+        self.pk_field = kwargs.pop('pk_field', None)
+        super().__init__(**kwargs)
+
+    def use_pk_only_optimization(self):
+        return True
+
+    def to_internal_value(self, data):
+        if type(data) is not str:
+            self.fail('incorrect_type', data_type=type(data).__name__)
+        data = AlphaId.decode(data)
+        if self.pk_field is not None:
+            data = self.pk_field.to_internal_value(data)
+        queryset = self.get_queryset()
+        try:
+            if isinstance(data, bool):
+                raise TypeError
+            return queryset.get(pk=data)
+        except ObjectDoesNotExist:
+            self.fail('does_not_exist', pk_value=data)
+        except (TypeError, ValueError):
+            self.fail('incorrect_type', data_type=type(data).__name__)
+
+    def to_representation(self, value):
+        if self.pk_field is not None:
+            return self.pk_field.to_representation(value.pk)
+        return AlphaId.encode(value.pk)
+
+
+class BaseModelSerializer(EncodeAlphaID, serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+
+    serializer_related_field = StringPrimaryKeyRelatedField
     serializer_field_mapping = {
         models.AutoField: IntegerField,
         models.BigIntegerField: IntegerField,
@@ -97,7 +159,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
     }
 
 
-class EncodeIdModelSerializer(EncodeAlphaID, BaseModelSerializer):
+class EncodedIdModelSerializer(BaseModelSerializer):
     id = serializers.SerializerMethodField()
 
 
