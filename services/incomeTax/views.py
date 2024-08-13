@@ -1,13 +1,9 @@
 import json
-import re
-from datetime import datetime
-import fitz
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics, serializers
+from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, \
     ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress, SalaryIncome, RentalIncome, BuyerDetails, \
@@ -101,24 +97,24 @@ class SendPanVerificationOtpApi(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        pan_number = request.data.get('pan_number')
-
+        user = request.user
         try:
-            tax_profile = IncomeTaxProfile.objects.get(pan_no=pan_number)
-            user = tax_profile.user
-
-            if not user.email:
-                return Response({'status': 'error', 'message': 'No email associated with this PAN number'},
+            tax_profile = IncomeTaxProfile.objects.get(user=user)
+            pan_number = tax_profile.pan_no
+        except IncomeTaxProfile.DoesNotExist:
+            pan_number = request.data.get('pan_number')
+            if not pan_number:
+                return Response({'status': 'error', 'message': 'PAN number is required for new users'},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            pan_service = PanVerificationService()
-            otp_id = pan_service.send_pan_verification_otp(user, pan_number)
-            return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_id': otp_id},
-                            status=status.HTTP_200_OK)
+        if not user.email:
+            return Response({'status': 'error', 'message': 'No email associated with this user'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        except IncomeTaxProfile.DoesNotExist:
-            return Response({'status': 'error', 'message': 'User with this PAN number does not exist'},
-                            status=status.HTTP_404_NOT_FOUND)
+        pan_service = PanVerificationService()
+        otp_id = pan_service.send_pan_verification_otp(user, pan_number)
+        return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_id': otp_id},
+                        status=status.HTTP_200_OK)
 
 
 class VerifyPanOtpApi(APIView):
@@ -135,13 +131,24 @@ class VerifyPanOtpApi(APIView):
         pan_service = PanVerificationService()
         if pan_service.verify_pan_otp(otp_id, otp):
             user = request.user
-            income_tax_profile = user.income_tax_profile
-            if income_tax_profile:
+            try:
+                income_tax_profile = IncomeTaxProfile.objects.get(user=user)
+            except IncomeTaxProfile.DoesNotExist:
+                if new_pan_number:
+                    if IncomeTaxProfile.objects.filter(pan_no=new_pan_number).exists():
+                        return Response({'status': 'error', 'message': 'This PAN number is already in use'}, status=status.HTTP_400_BAD_REQUEST)
+                    income_tax_profile = IncomeTaxProfile.objects.create(
+                        user=user,
+                        pan_no=new_pan_number,
+                        is_pan_verified=True
+                    )
+                else:
+                    return Response({'status': 'error', 'message': 'No IncomeTaxProfile found and no new PAN number provided'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
                 if new_pan_number:
                     if IncomeTaxProfile.objects.filter(pan_no=new_pan_number).exists():
                         return Response({'status': 'error', 'message': 'This PAN number is already in use'}, status=status.HTTP_400_BAD_REQUEST)
                     income_tax_profile.pan_no = new_pan_number
-
                 income_tax_profile.is_pan_verified = True
                 income_tax_profile.save()
 
@@ -157,15 +164,15 @@ class VerifyPanOtpApi(APIView):
                     'status': tax_return.get_status_display(),
                     'name': year.name
                 })
-
             return Response({
                 'status_code': 200,
                 'status_text': 'OK',
                 'data': {
                     'status': 'success',
-                    'message': 'PAN OTP verification successful and PAN updated',
+                    'message': 'PAN OTP verification successful',
                     'is_pan_verified': income_tax_profile.is_pan_verified,
-                    'new_pan_number': income_tax_profile.pan_no
+                    'pan_number': income_tax_profile.pan_no,
+                    'income_tax_returns': created_records
                 }
             }, status=status.HTTP_200_OK)
         else:
@@ -814,7 +821,7 @@ class TaxPaidApi(generics.GenericAPIView):
             item_data_dict = json.loads(item_data)
             item_data_dict['income_tax'] = income_tax_profile.id
             item_data_dict['income_tax_return'] = income_tax_return.id
-            item_data_dict['upload_challan'] = file
+            item_data_dict['challan_pdf'] = file
             serializer = SelfAssesmentAndAdvanceTaxPaidSerializer(data=item_data_dict)
             serializer.is_valid(raise_exception=True)
             record = serializer.save()
@@ -858,7 +865,7 @@ class TaxPaidApi(generics.GenericAPIView):
             item_data_dict = json.loads(item_data)
             item_data_dict['income_tax'] = income_tax_profile
             item_data_dict['income_tax_return'] = income_tax_return
-            item_data_dict['upload_challan'] = file
+            item_data_dict['challan_pdf'] = file
             self_assessment_and_advance_tax_paid, created = SelfAssesmentAndAdvanceTaxPaid.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
