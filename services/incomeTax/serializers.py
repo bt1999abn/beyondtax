@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
 import fitz
 from django.core.validators import RegexValidator
 from django.shortcuts import get_object_or_404
@@ -67,10 +67,15 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         return data
 
     def validate_date_of_birth(self, value):
-        try:
-            return datetime.strptime(value, "%d-%m-%Y").date()
-        except ValueError:
-            raise serializers.ValidationError("Date of birth must be in the format dd-mm-yyyy")
+        if isinstance(value, str):
+            try:
+                return datetime.strptime(value, "%d-%m-%Y").date()
+            except ValueError:
+                raise serializers.ValidationError("Date of birth must be in the format dd-mm-yyyy")
+        elif isinstance(value, date):
+            return value
+        else:
+            raise serializers.ValidationError("Invalid type for date_of_birth")
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -79,23 +84,18 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         answers_data = validated_data.pop('answers', [])
 
         income_tax_profile = IncomeTaxProfile.objects.create(user=user, **validated_data)
-
         for bank_detail_data in bank_details_data:
             IncomeTaxBankDetails.objects.create(income_tax=income_tax_profile, **bank_detail_data)
-
         if address_data:
             IncomeTaxAddress.objects.create(income_tax=income_tax_profile, **address_data)
-
         for answer_data in answers_data:
             ResidentialStatusAnswer.objects.create(income_tax=income_tax_profile, **answer_data)
-        next_question_data = self.process_answers(income_tax_profile, answers_data)
-        return income_tax_profile, next_question_data
+        return income_tax_profile
 
     def update(self, instance, validated_data):
         bank_details_data = validated_data.pop('income_tax_bankdetails', [])
         address_data = validated_data.pop('address', None)
         answers_data = validated_data.pop('answers', [])
-
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -108,25 +108,21 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
                 address_instance.save()
             else:
                 IncomeTaxAddress.objects.create(income_tax=instance, **address_data)
-
         IncomeTaxBankDetails.objects.filter(income_tax=instance).delete()
         for bank_detail_data in bank_details_data:
             IncomeTaxBankDetails.objects.create(income_tax=instance, **bank_detail_data)
-
         ResidentialStatusAnswer.objects.filter(income_tax=instance).delete()
         for answer_data in answers_data:
             ResidentialStatusAnswer.objects.create(income_tax=instance, **answer_data)
-        next_question_data = self.process_answers(instance, answers_data)
-        return instance, next_question_data
+
+        return instance
 
     def process_answers(self, profile, answers_data):
         final_status = None
         next_question_id = None
-
         for answer_data in answers_data:
             current_question_id = answer_data.get('question').id
             answer_text = answer_data.get('answer_text')
-
             if current_question_id == 8:
                 if answer_text == "Less than 60 days":
                     final_status = IncomeTaxProfile.NonResidentIndian
@@ -166,12 +162,10 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
                     final_status = IncomeTaxProfile.NonResidentIndian
                 elif answer_text == "Yes":
                     next_question_id = 10
-
             if final_status is not None:
                 profile.residential_status = final_status
                 profile.save()
                 return {"status": dict(IncomeTaxProfile.RESIDENTIAL_STATUS_CHOICES).get(final_status)}
-
             if next_question_id is not None:
                 next_question = get_object_or_404(ResidentialStatusQuestions, id=next_question_id)
                 next_question_data = self.build_question_tree(next_question)
