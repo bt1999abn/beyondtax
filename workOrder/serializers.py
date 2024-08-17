@@ -1,10 +1,11 @@
 from django.db.models import Sum
 from rest_framework import serializers
 from accounts.models import ServicePages
+from shared.rest.serializers import BaseModelSerializer, BaseSerializer
 from workOrder.models import WorkOrderDocument, WorkOrder, WorkOrderDownloadDocument, WorkorderPayment
 
 
-class WorkOrderSerializer(serializers.ModelSerializer):
+class WorkOrderSerializer(BaseModelSerializer):
     user = serializers.ReadOnlyField(source='user.id')
     service_id = serializers.IntegerField(write_only=True)
     service_name = serializers.SerializerMethodField()
@@ -59,7 +60,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         fields = ['document_name', 'document_file']
 
 
-class WorkOrderDocumentsUploadSerializer(serializers.ModelSerializer):
+class WorkOrderDocumentsUploadSerializer(BaseModelSerializer):
     work_order_id = serializers.IntegerField(write_only=True)
     documents = DocumentSerializer(many=True, write_only=True)
 
@@ -96,7 +97,7 @@ class WorkOrderDocumentsUploadSerializer(serializers.ModelSerializer):
         return work_order
 
 
-class WorkOrderDownloadDocumentSerializer(serializers.Serializer):
+class WorkOrderDownloadDocumentSerializer(BaseModelSerializer):
     document_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -110,7 +111,7 @@ class WorkOrderDownloadDocumentSerializer(serializers.Serializer):
         return None
 
 
-class WorkOrderDownloadDocumentListSerializer(serializers.Serializer):
+class WorkOrderDownloadDocumentListSerializer(BaseModelSerializer):
     document_url = serializers.SerializerMethodField()
     wo_dept = serializers.SerializerMethodField()
 
@@ -129,7 +130,7 @@ class WorkOrderDownloadDocumentListSerializer(serializers.Serializer):
         return obj.work_order.wo_dept if obj.work_order else None
 
 
-class WorkorderPaymentSerializer(serializers.ModelSerializer):
+class WorkorderPaymentSerializer(BaseModelSerializer):
     class Meta:
         model = WorkorderPayment
         fields = ['work_order', 'bank_account', 'ifsc_code', 'recipient_name', 'qr_code_url',

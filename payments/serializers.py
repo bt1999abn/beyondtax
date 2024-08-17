@@ -1,8 +1,8 @@
-from rest_framework import serializers
 from payments.models import Payment
+from shared.rest.serializers import BaseModelSerializer
 
 
-class PaymentSerializer(serializers.ModelSerializer):
+class PaymentSerializer(BaseModelSerializer):
 
     class Meta:
         model = Payment

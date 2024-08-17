@@ -8,9 +8,10 @@ from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, In
     IncomeTaxReturn, ResidentialStatusQuestions, ResidentialStatusAnswer, SalaryIncome, RentalIncome, BuyerDetails, \
     CapitalGains, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, IncomeFromBetting, DividendIncome, \
     InterestOnItRefunds, ExemptIncome, BusinessIncome, AgricultureIncome, LandDetails, Deductions, InterestIncome
+from shared.rest.serializers import BaseModelSerializer, BaseSerializer
 
 
-class IncomeTaxBankDetailsSerializer(serializers.ModelSerializer):
+class IncomeTaxBankDetailsSerializer(BaseModelSerializer):
     class Meta:
         model = IncomeTaxBankDetails
         fields = ['id', 'account_no', 'ifsc_code', 'bank_name', 'type', 'created_at']
@@ -22,7 +23,7 @@ class IncomeTaxBankDetailsSerializer(serializers.ModelSerializer):
         }
 
 
-class IncomeTaxAddressSerializer(serializers.ModelSerializer):
+class IncomeTaxAddressSerializer(BaseModelSerializer):
     class Meta:
         model = IncomeTaxAddress
         fields = ['door_no', 'permise_name', 'street', 'area', 'city', 'state', 'pincode', 'country']
@@ -37,13 +38,13 @@ class IncomeTaxAddressSerializer(serializers.ModelSerializer):
         }
 
 
-class ResidentialStatusAnswerSerializer(serializers.ModelSerializer):
+class ResidentialStatusAnswerSerializer(BaseModelSerializer):
     class Meta:
         model = ResidentialStatusAnswer
         fields = ['question', 'answer_text']
 
 
-class IncomeTaxProfileSerializer(serializers.ModelSerializer):
+class IncomeTaxProfileSerializer(BaseModelSerializer):
     income_tax_bankdetails = IncomeTaxBankDetailsSerializer(many=True, required=False)
     address = IncomeTaxAddressSerializer(required=False)
     answers = ResidentialStatusAnswerSerializer(many=True, required=False)
@@ -181,13 +182,13 @@ class IncomeTaxProfileSerializer(serializers.ModelSerializer):
         return question_data
 
 
-class IncomeTaxReturnYearSerializer(serializers.ModelSerializer):
+class IncomeTaxReturnYearSerializer(BaseModelSerializer):
     class Meta:
         model = IncomeTaxReturnYears
         fields = ('id','name','start_date', 'end_date', 'due_date', 'status')
 
 
-class IncomeTaxReturnSerializer(serializers.ModelSerializer):
+class IncomeTaxReturnSerializer(BaseModelSerializer):
     income_tax_return_year = IncomeTaxReturnYearSerializer()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     class Meta:
@@ -195,7 +196,7 @@ class IncomeTaxReturnSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'income_tax_return_year', 'status', 'status_display')
 
 
-class ResidentialStatusQuestionsSerializer(serializers.ModelSerializer):
+class ResidentialStatusQuestionsSerializer(BaseModelSerializer):
     options_type_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -206,7 +207,7 @@ class ResidentialStatusQuestionsSerializer(serializers.ModelSerializer):
         return obj.get_options_type_display()
 
 
-class SalaryIncomeSerializer(serializers.ModelSerializer):
+class SalaryIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = SalaryIncome
         fields = "__all__"
@@ -218,20 +219,20 @@ class SalaryIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class RentalIncomeSerializer(serializers.ModelSerializer):
+class RentalIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = RentalIncome
         fields = "__all__"
 
 
-class BuyerDetailsSerializer(serializers.ModelSerializer):
+class BuyerDetailsSerializer(BaseModelSerializer):
     class Meta:
         model = BuyerDetails
         fields = "__all__"
         extra_kwargs = {'capital_gains': {'required': False}}
 
 
-class CapitalGainsSerializer(serializers.ModelSerializer):
+class CapitalGainsSerializer(BaseModelSerializer):
     buyer_details = BuyerDetailsSerializer(many=True, required=False)
 
     class Meta:
@@ -280,7 +281,7 @@ class CapitalGainsSerializer(serializers.ModelSerializer):
         return instance
 
 
-class LandDetailsSerializer(serializers.ModelSerializer):
+class LandDetailsSerializer(BaseModelSerializer):
     class Meta:
         model = LandDetails
         fields = "__all__"
@@ -313,7 +314,7 @@ class AgricultureIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class BusinessIncomeSerializer(serializers.ModelSerializer):
+class BusinessIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = BusinessIncome
         fields = "__all__"
@@ -325,7 +326,7 @@ class BusinessIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class ExemptIncomeSerializer(serializers.ModelSerializer):
+class ExemptIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = ExemptIncome
         fields = "__all__"
@@ -337,7 +338,7 @@ class ExemptIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class AgricultureAndExemptIncomeSerializer(serializers.Serializer):
+class AgricultureAndExemptIncomeSerializer(BaseModelSerializer):
     agriculture_incomes = AgricultureIncomeSerializer(many=True, required=False)
     exempt_incomes = ExemptIncomeSerializer(many=True, required=False)
 
@@ -345,7 +346,7 @@ class AgricultureAndExemptIncomeSerializer(serializers.Serializer):
         fields = ['agriculture_incomes', 'exempt_incomes']
 
 
-class InterestIncomeSerializer(serializers.ModelSerializer):
+class InterestIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = InterestIncome
         fields = "__all__"
@@ -357,7 +358,7 @@ class InterestIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class InterestOnItRefundsSerializer(serializers.ModelSerializer):
+class InterestOnItRefundsSerializer(BaseModelSerializer):
     class Meta:
         model = InterestOnItRefunds
         fields = "__all__"
@@ -369,7 +370,7 @@ class InterestOnItRefundsSerializer(serializers.ModelSerializer):
         return instance
 
 
-class DividendIncomeSerializer(serializers.ModelSerializer):
+class DividendIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = DividendIncome
         fields = "__all__"
@@ -381,7 +382,7 @@ class DividendIncomeSerializer(serializers.ModelSerializer):
         return instance
 
 
-class IncomeFromBettingSerializer(serializers.ModelSerializer):
+class IncomeFromBettingSerializer(BaseModelSerializer):
     class Meta:
         model = IncomeFromBetting
         fields = "__all__"
@@ -393,7 +394,7 @@ class IncomeFromBettingSerializer(serializers.ModelSerializer):
         return instance
 
 
-class OtherIncomesSerializer(serializers.Serializer):
+class OtherIncomesSerializer(BaseModelSerializer):
     interest_incomes = InterestIncomeSerializer(many=True, required=False)
     interest_on_it_refunds = InterestOnItRefundsSerializer(many=True, required=False)
     dividend_incomes = DividendIncomeSerializer(many=True, required=False)
@@ -403,7 +404,7 @@ class OtherIncomesSerializer(serializers.Serializer):
         fields = ['interest_incomes', 'interest_on_it_refunds', 'dividend_incomes', 'income_from_betting']
 
 
-class TdsOrTcsDeductionSerializer(serializers.ModelSerializer):
+class TdsOrTcsDeductionSerializer(BaseModelSerializer):
     class Meta:
         model = TdsOrTcsDeduction
         fields = "__all__"
@@ -415,7 +416,7 @@ class TdsOrTcsDeductionSerializer(serializers.ModelSerializer):
         return instance
 
 
-class SelfAssesmentAndAdvanceTaxPaidSerializer(serializers.ModelSerializer):
+class SelfAssesmentAndAdvanceTaxPaidSerializer(BaseModelSerializer):
     class Meta:
         model = SelfAssesmentAndAdvanceTaxPaid
         fields = "__all__"
@@ -427,7 +428,7 @@ class SelfAssesmentAndAdvanceTaxPaidSerializer(serializers.ModelSerializer):
         return instance
 
 
-class TaxPaidSerializer(serializers.Serializer):
+class TaxPaidSerializer(BaseModelSerializer):
     tds_or_tcs_deductions = TdsOrTcsDeductionSerializer(many=True, required=False)
     self_assessment_and_advance_tax_paid = SelfAssesmentAndAdvanceTaxPaidSerializer(many=True, required=False)
 
@@ -435,7 +436,7 @@ class TaxPaidSerializer(serializers.Serializer):
         fields = ['tds_or_tcs_deductions', 'self_assessment_and_advance_tax_paid']
 
 
-class DeductionsSerializer(serializers.ModelSerializer):
+class DeductionsSerializer(BaseModelSerializer):
     class Meta:
         model = Deductions
         fields = "__all__"
@@ -447,7 +448,7 @@ class DeductionsSerializer(serializers.ModelSerializer):
         return instance
 
 
-class AISPdfUploadSerializer(serializers.Serializer):
+class AISPdfUploadSerializer(BaseSerializer):
     ais_pdf = serializers.FileField()
 
     def extract_text_from_pdf(self, pdf_file, password):
@@ -629,7 +630,7 @@ class AISPdfUploadSerializer(serializers.Serializer):
         return self.save_extracted_data(extracted_data, income_tax_return)
 
 
-class TdsPdfSerializer(serializers.Serializer):
+class TdsPdfSerializer(BaseSerializer):
     tds_pdf = serializers.FileField()
 
     def validate(self, data):
@@ -706,7 +707,7 @@ class TdsPdfSerializer(serializers.Serializer):
             return []
 
 
-class ChallanPdfUploadSerializer(serializers.Serializer):
+class ChallanPdfUploadSerializer(BaseSerializer):
     challan_pdf = serializers.FileField()
 
     def extract_challan_details_from_pdf(self, pdf_file):

@@ -6,7 +6,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from shared.libs.hashing import AlphaId
 from shared.rest.pagination import CustomPagination
 from workOrder import serializers
 from workOrder.models import WorkOrderDownloadDocument, WorkOrder, WorkorderPayment
@@ -133,12 +133,13 @@ class WorkOrderDownloadDocumentApi(generics.RetrieveAPIView):
     serializer_class = WorkOrderDownloadDocumentSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_object(self,*args,**kwargs):
+    def get_object(self, *args, **kwargs):
         work_order_id = self.kwargs.get('work_order_id')
         if not work_order_id:
             raise ValueError("WorkOrder ID is required.")
         try:
-            document = WorkOrderDownloadDocument.objects.get(work_order_id=work_order_id)
+            decoded_work_order_id = AlphaId.decode(work_order_id)
+            document = WorkOrderDownloadDocument.objects.get(work_order_id=decoded_work_order_id)
             return document
         except WorkOrderDownloadDocument.DoesNotExist:
             raise serializers.ValidationError(f"No document found for WorkOrder ID {work_order_id}.")
@@ -159,7 +160,8 @@ class WorkorderPaymentRetriveApi(APIView):
 
     def get(self, request, work_order_id):
         try:
-            work_order = WorkOrder.objects.get(id=work_order_id)
+            decoded_work_order_id = AlphaId.decode(work_order_id)
+            work_order = WorkOrder.objects.get(id=decoded_work_order_id)
         except WorkOrder.DoesNotExist:
             return Response({"error": f"No WorkOrder found with ID {work_order_id}"}, status=status.HTTP_404_NOT_FOUND)
         payments = WorkorderPayment.objects.filter(work_order=work_order)

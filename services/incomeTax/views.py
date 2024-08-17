@@ -18,6 +18,7 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     TdsPdfSerializer, ChallanPdfUploadSerializer, AISPdfUploadSerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from shared.libs.hashing import AlphaId
 
 
 class IncomeTaxProfileApi(APIView):
@@ -106,11 +107,9 @@ class SendPanVerificationOtpApi(APIView):
             if not pan_number:
                 return Response({'status': 'error', 'message': 'PAN number is required for new users'},
                                 status=status.HTTP_400_BAD_REQUEST)
-
         if not user.email:
             return Response({'status': 'error', 'message': 'No email associated with this user'},
                             status=status.HTTP_400_BAD_REQUEST)
-
         pan_service = PanVerificationService()
         otp_id = pan_service.send_pan_verification_otp(user, pan_number)
         return Response({'status': 'success', 'message': 'OTP sent to your email', 'otp_id': otp_id},
@@ -126,32 +125,31 @@ class VerifyPanOtpApi(APIView):
         new_pan_number = request.data.get('new_pan_number')
 
         if not otp:
-            return Response({'status': 'error', 'message': 'OTP is a required field'}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({'status': 'error', 'message': 'OTP is a required field'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        otp_id_decoded = AlphaId.decode(otp_id)
         pan_service = PanVerificationService()
-        if pan_service.verify_pan_otp(otp_id, otp):
+        if pan_service.verify_pan_otp(otp_id_decoded, otp):
             user = request.user
             try:
                 income_tax_profile = IncomeTaxProfile.objects.get(user=user)
             except IncomeTaxProfile.DoesNotExist:
-                if new_pan_number:
-                    if IncomeTaxProfile.objects.filter(pan_no=new_pan_number).exists():
-                        return Response({'status': 'error', 'message': 'This PAN number is already in use'}, status=status.HTTP_400_BAD_REQUEST)
-                    income_tax_profile = IncomeTaxProfile.objects.create(
-                        user=user,
-                        pan_no=new_pan_number,
-                        is_pan_verified=True
-                    )
-                else:
-                    return Response({'status': 'error', 'message': 'No IncomeTaxProfile found and no new PAN number provided'}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                if new_pan_number:
-                    if IncomeTaxProfile.objects.filter(pan_no=new_pan_number).exists():
-                        return Response({'status': 'error', 'message': 'This PAN number is already in use'}, status=status.HTTP_400_BAD_REQUEST)
-                    income_tax_profile.pan_no = new_pan_number
-                income_tax_profile.is_pan_verified = True
-                income_tax_profile.save()
+                if not new_pan_number:
+                    return Response({'status': 'error', 'message': 'No PAN number provided for new user.'},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
+                if IncomeTaxProfile.objects.filter(pan_no=new_pan_number).exists():
+                    return Response({'status': 'error', 'message': 'This PAN number is already in use'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                IncomeTaxReturn.objects.filter(user=user).delete()
+                income_tax_profile = IncomeTaxProfile.objects.create(
+                    user=user,
+                    pan_no=new_pan_number,
+                    is_pan_verified=True
+                )
+
+            income_tax_profile.is_pan_verified = True
+            income_tax_profile.save()
             income_tax_return_years = IncomeTaxReturnYears.objects.filter(status=IncomeTaxReturnYears.Open)
             created_records = []
             for year in income_tax_return_years:
@@ -162,7 +160,8 @@ class VerifyPanOtpApi(APIView):
                 )
                 created_records.append({
                     'status': tax_return.get_status_display(),
-                    'name': year.name
+                    'name': year.name,
+                    'year_id': AlphaId.encode(year.id)
                 })
             return Response({
                 'status_code': 200,
@@ -176,7 +175,8 @@ class VerifyPanOtpApi(APIView):
                 }
             }, status=status.HTTP_200_OK)
         else:
-            return Response({'status': 'error', 'message': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'status': 'error', 'message': 'Invalid or expired OTP'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
 class ImportIncomeTaxProfileDataApi(APIView):
@@ -240,12 +240,15 @@ class SalaryIncomeListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
-        return SalaryIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+        return SalaryIncome.objects.filter(income_tax__user=user,
+                                               income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data.getlist('data')
@@ -275,7 +278,8 @@ class SalaryIncomeUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
 
@@ -313,12 +317,14 @@ class RentalIncomeListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         return RentalIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -343,7 +349,8 @@ class RentalIncomeUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -369,12 +376,14 @@ class CapitalGainsListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         return CapitalGains.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -421,7 +430,8 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -470,12 +480,14 @@ class BusinessIncomeListCreateApi(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         return BusinessIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -496,7 +508,8 @@ class BusinessIncomeUpdateApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -522,13 +535,14 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
 
         agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
         exempt_incomes = ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
-
         data = {
             'agriculture_incomes': AgricultureIncomeSerializer(agriculture_incomes, many=True).data,
             'exempt_incomes': ExemptIncomeSerializer(exempt_incomes, many=True).data
@@ -537,7 +551,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -581,7 +596,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -629,7 +645,8 @@ class OtherIncomesApi(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         interest_incomes = InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
@@ -646,7 +663,8 @@ class OtherIncomesApi(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -709,7 +727,8 @@ class OtherIncomesApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = get_object_or_404(IncomeTaxProfile, user=user)
         income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
         data = request.data
@@ -779,7 +798,8 @@ class TaxPaidApi(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
 
@@ -798,7 +818,8 @@ class TaxPaidApi(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
 
@@ -836,7 +857,8 @@ class TaxPaidApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
 
@@ -890,7 +912,8 @@ class DeductionsApi(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         try:
             deductions = Deductions.objects.get(income_tax__user=user, income_tax_return_id=income_tax_return_id)
             serializer = DeductionsSerializer(deductions)
@@ -900,7 +923,8 @@ class DeductionsApi(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
@@ -914,7 +938,8 @@ class DeductionsApi(generics.GenericAPIView):
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         try:
             deductions = Deductions.objects.get(income_tax__user=user, income_tax_return_id=income_tax_return_id)
         except Deductions.DoesNotExist:
@@ -933,7 +958,8 @@ class TotalIncomeGetAPIView(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs['income_tax_return_id']
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
 
         income_tax_profile = get_object_or_404(IncomeTaxProfile, user=user)
         income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
@@ -1009,7 +1035,8 @@ class TotalSummaryGetAPI(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_id = self.kwargs.get('income_tax_return_id')
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=user)
         income_tax_profile = income_tax_return.user.income_tax_profile
 
@@ -1064,7 +1091,8 @@ class AISPdfUploadApi(generics.CreateAPIView):
     serializer_class = AISPdfUploadSerializer
 
     def post(self, request, *args, **kwargs):
-        income_tax_return_id = kwargs.get('income_tax_return_id')
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
 
         try:
             income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=request.user)
@@ -1092,7 +1120,8 @@ class TdsPdfUploadApi(generics.CreateAPIView):
     serializer_class = TdsPdfSerializer
 
     def create(self, request, *args, **kwargs):
-        income_tax_return_id = kwargs.get('income_tax_return_id')
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         serializer = self.get_serializer(data=request.data, context={'request': request, 'income_tax_return_id': income_tax_return_id})
         serializer.is_valid(raise_exception=True)
         saved_records = serializer.save()
@@ -1108,7 +1137,8 @@ class ChallanUploadApi(generics.CreateAPIView):
     serializer_class = ChallanPdfUploadSerializer
 
     def post(self, request, *args, **kwargs):
-        income_tax_return_id = kwargs.get('income_tax_return_id')
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
 
         try:
             income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=request.user)
@@ -1123,8 +1153,11 @@ class ChallanUploadApi(generics.CreateAPIView):
         return Response({"message": "Data processed successfully", "data": saved_data}, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
-        income_tax_return_id = kwargs.get('income_tax_return_id')
-        challan_id = request.data.get('id')
+        encoded_income_tax_return_id = kwargs.get('income_tax_return_id')
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+
+        encoded_challan_id = request.data.get('id')
+        challan_id = AlphaId.decode(encoded_challan_id)
 
         try:
             income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=request.user)
