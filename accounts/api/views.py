@@ -21,6 +21,7 @@ from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails
 from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
 from beyondTax import settings
+from shared.libs.hashing import AlphaId
 
 
 class sendOtpApi(APIView):
@@ -86,7 +87,7 @@ class RegistrationApiView(APIView):
             # success, result = service.send_otp(phone_number=user.mobile_number)
             # if success:
             return Response({
-                    'user_id': user.id,
+                    'user_id': AlphaId.encode(user.id),
                     # 'otp_session_id': result
                 }, status=status.HTTP_201_CREATED)
         else:
@@ -311,7 +312,8 @@ class BusinessContactPersonAPIView(APIView):
 
     def patch(self, request, pk):
         try:
-            contact_person = BusinessContactPersonDetails.objects.get(pk=pk, user=request.user)
+            decoded_pk = AlphaId.decode(pk)
+            contact_person = BusinessContactPersonDetails.objects.get(pk=decoded_pk, user=request.user)
         except BusinessContactPersonDetails.DoesNotExist:
             return Response({"detail": "Contact person not found"}, status=status.HTTP_404_NOT_FOUND)
 

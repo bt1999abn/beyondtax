@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from accounts.models import OtpRecord
 from accounts.services import EmailService
+from shared.libs.hashing import AlphaId
 
 
 class PanVerificationService:
@@ -27,7 +28,7 @@ class PanVerificationService:
         email_service.send_email(user.email, 'Your OTP for PAN Verification',
                                  'email_templates/pan_verification_email.html', context)
 
-        return otp_record.id
+        return AlphaId.encode(otp_record.id)
 
     def verify_pan_otp(self, otp_id, otp):
         try:

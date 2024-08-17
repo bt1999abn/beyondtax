@@ -1,14 +1,14 @@
-from rest_framework import serializers
 from blogs.models import BlogPost
+from shared.rest.serializers import BaseModelSerializer
 
 
-class BlogPostSerializer(serializers.ModelSerializer):
+class BlogPostSerializer(BaseModelSerializer):
     class Meta:
         model = BlogPost
-        exclude = ['content']
+        exclude = ['id','content']
 
 
-class BlogPostDetailSerializer(serializers.ModelSerializer):
+class BlogPostDetailSerializer(BaseModelSerializer):
     class Meta:
         model = BlogPost
         fields = '__all__'

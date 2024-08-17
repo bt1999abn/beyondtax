@@ -9,11 +9,13 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturnYears
+from shared.libs.hashing import AlphaId
+from shared.rest.serializers import BaseSerializer, BaseModelSerializer
 
 User = get_user_model()
 
 
-class LoginSerializer(serializers.Serializer):
+class LoginSerializer(BaseSerializer):
     email_or_mobile = serializers.CharField(required=False)
     password = serializers.CharField(max_length=128, required=True)
     token = serializers.CharField(required=False)
@@ -58,11 +60,11 @@ class LoginSerializer(serializers.Serializer):
             current_year_record = IncomeTaxReturnYears.objects.get(
                 start_date__lte=current_date, end_date__gte=current_date
             )
-            current_year_id = current_year_record.id
+            current_year_id = AlphaId.encode(current_year_record.id)
         except ObjectDoesNotExist:
             current_year_id = None
         return {
-            'id': user.id,
+            'id': AlphaId.encode(user.id),
             'full_name': full_name,
             'email': user.email,
             'mobile_number': user.mobile_number,
@@ -81,7 +83,7 @@ class AuthSerializer(serializers.Serializer):
     error = serializers.CharField(required=False)
 
 
-class RegistrationSerializer(serializers.Serializer):
+class RegistrationSerializer(BaseModelSerializer):
     mobile_regex = RegexValidator(
         regex=r'^[1-9][0-9]{9}$',
         message="Please enter a valid mobile number format."
@@ -99,6 +101,13 @@ class RegistrationSerializer(serializers.Serializer):
     business_mobile_number = serializers.CharField(validators=[mobile_regex], max_length=10, min_length=10,
                                                    required=False)
     business_email = serializers.EmailField(required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'client_type', 'mobile_number', 'full_name', 'date_of_birth', 'password',
+            'state', 'email', 'business_name', 'business_contact_person', 'business_mobile_number', 'business_email'
+        ]
 
     def validate(self, attrs):
         client_type = attrs.get('client_type')
@@ -144,7 +153,7 @@ class RegistrationSerializer(serializers.Serializer):
         return user
 
 
-class UserProfileSerializer(serializers.Serializer):
+class UserProfileSerializer(BaseSerializer):
     mobile_regex = RegexValidator(
         regex=r'^[1-9][0-9]{9}$',
         message="Please enter a valid mobile number format."
@@ -228,7 +237,7 @@ class UserProfileSerializer(serializers.Serializer):
         return instance
 
 
-class ChangePasswordSerializer(serializers.Serializer):
+class ChangePasswordSerializer(BaseSerializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True)
     confirm_new_password = serializers.CharField(required=True)
@@ -250,18 +259,17 @@ class ChangePasswordSerializer(serializers.Serializer):
         return instance
 
 
-class UserBasicDetailsSerializer(serializers.Serializer):
+class UserBasicDetailsSerializer(BaseModelSerializer):
     full_name = serializers.SerializerMethodField()
-    mobile_number = serializers.CharField(max_length=10)
-    date_of_birth = serializers.DateField()
-    email = serializers.EmailField()
-    profile_picture = serializers.ImageField()
     profile_title = serializers.SerializerMethodField()
-    client_type = serializers.ChoiceField(choices=User.CLIENT_TYPE_CHOICES)
-    business_name = serializers.CharField()
-    date_of_formation = serializers.DateField()
-    business_mobile_number = serializers.CharField()
-    business_email = serializers.EmailField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'full_name', 'mobile_number', 'date_of_birth', 'email',
+            'profile_picture', 'profile_title', 'client_type',
+            'business_name', 'date_of_formation', 'business_mobile_number', 'business_email'
+        ]
 
     def get_full_name(self, obj):
         first_name = obj.first_name or ""
@@ -272,12 +280,12 @@ class UserBasicDetailsSerializer(serializers.Serializer):
         return obj.profile_title()
 
 
-class UpcomingDueDateSerializer(serializers.ModelSerializer):
+class UpcomingDueDateSerializer(BaseModelSerializer):
     formatted_date = serializers.SerializerMethodField()
 
     class Meta:
         model = UpcomingDueDates
-        fields = ['formatted_date', 'date', 'compliance_activity', 'service_type', 'penalty_fine_interest']
+        fields = ['id','formatted_date', 'date', 'compliance_activity', 'service_type', 'penalty_fine_interest']
 
     def get_formatted_date(self, obj):
         return obj.date.strftime('%d-%m-%Y')
@@ -291,21 +299,21 @@ class UpcomingDueDatesFilter(filters.FilterSet):
         fields = ['service_type']
 
 
-class BusinessContactPersonSerializer(serializers.ModelSerializer):
+class BusinessContactPersonSerializer(BaseModelSerializer):
     class Meta:
         model = BusinessContactPersonDetails
         fields = '__all__'
 
 
-class UserBusinessContactPersonsSerializer(serializers.ModelSerializer):
+class UserBusinessContactPersonsSerializer(BaseModelSerializer):
     contact_persons = BusinessContactPersonSerializer(many=True)
 
     class Meta:
         model = User
-        fields = ['contact_persons']
+        fields = ['id', 'contact_persons']
 
 
-class PasswordResetSerializer(serializers.Serializer):
+class PasswordResetSerializer(BaseSerializer):
     otp_id = serializers.IntegerField(required=True)
     password = serializers.CharField(required=True, write_only=True)
     confirm_password = serializers.CharField(required=True, write_only=True)
@@ -331,7 +339,7 @@ class PasswordResetSerializer(serializers.Serializer):
         return attrs
 
 
-class UpdateUserTypeSerializer(serializers.ModelSerializer):
+class UpdateUserTypeSerializer(BaseModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'client_type']
