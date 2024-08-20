@@ -8,6 +8,7 @@ from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, In
     IncomeTaxReturn, ResidentialStatusQuestions, ResidentialStatusAnswer, SalaryIncome, RentalIncome, BuyerDetails, \
     CapitalGains, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, IncomeFromBetting, DividendIncome, \
     InterestOnItRefunds, ExemptIncome, BusinessIncome, AgricultureIncome, LandDetails, Deductions, InterestIncome
+from shared.libs.hashing import AlphaId
 from shared.rest.serializers import BaseModelSerializer, BaseSerializer
 
 
@@ -212,6 +213,11 @@ class SalaryIncomeSerializer(BaseModelSerializer):
         model = SalaryIncome
         fields = "__all__"
 
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -223,6 +229,11 @@ class RentalIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = RentalIncome
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
 
 
 class BuyerDetailsSerializer(BaseModelSerializer):
@@ -238,6 +249,14 @@ class CapitalGainsSerializer(BaseModelSerializer):
     class Meta:
         model = CapitalGains
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        for buyer in data.get('buyer_details', []):
+            if 'id' in buyer:
+                buyer['id'] = AlphaId.decode(buyer['id'])
+        return super().to_internal_value(data)
 
     def validate(self, data):
         asset_type = data.get('asset_type')
@@ -270,8 +289,6 @@ class CapitalGainsSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         buyer_details_data = validated_data.pop('buyer_details', [])
         instance = super().update(instance, validated_data)
-
-        # Update or create buyer details
         for buyer_data in buyer_details_data:
             BuyerDetails.objects.update_or_create(
                 capital_gains=instance,
@@ -293,6 +310,14 @@ class AgricultureIncomeSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgricultureIncome
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        for land in data.get('land_details', []):
+            if 'id' in land:
+                land['id'] = AlphaId.decode(land['id'])
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         land_details_data = validated_data.pop('land_details', [])
@@ -319,6 +344,11 @@ class BusinessIncomeSerializer(BaseModelSerializer):
         model = BusinessIncome
         fields = "__all__"
 
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -330,6 +360,11 @@ class ExemptIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = ExemptIncome
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
@@ -351,6 +386,11 @@ class InterestIncomeSerializer(BaseModelSerializer):
         model = InterestIncome
         fields = "__all__"
 
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -362,6 +402,11 @@ class InterestOnItRefundsSerializer(BaseModelSerializer):
     class Meta:
         model = InterestOnItRefunds
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
@@ -375,6 +420,11 @@ class DividendIncomeSerializer(BaseModelSerializer):
         model = DividendIncome
         fields = "__all__"
 
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -386,6 +436,11 @@ class IncomeFromBettingSerializer(BaseModelSerializer):
     class Meta:
         model = IncomeFromBetting
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
@@ -409,6 +464,11 @@ class TdsOrTcsDeductionSerializer(BaseModelSerializer):
         model = TdsOrTcsDeduction
         fields = "__all__"
 
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
+
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -420,6 +480,11 @@ class SelfAssesmentAndAdvanceTaxPaidSerializer(BaseModelSerializer):
     class Meta:
         model = SelfAssesmentAndAdvanceTaxPaid
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
@@ -440,6 +505,11 @@ class DeductionsSerializer(BaseModelSerializer):
     class Meta:
         model = Deductions
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        if 'id' in data:
+            data['id'] = AlphaId.decode(data['id'])
+        return super().to_internal_value(data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
@@ -755,7 +825,7 @@ class ChallanPdfUploadSerializer(BaseSerializer):
             challan_pdf=challan_pdf
         )
         response_data = {
-            "id": saved_record.id,
+            "id": AlphaId.encode(saved_record.id),
             "bsr_code": saved_record.bsr_code,
             "challan_no": saved_record.challan_no,
             "date_of_deposit": saved_record.date.strftime("%d-%b-%Y"),
@@ -772,7 +842,7 @@ class ChallanPdfUploadSerializer(BaseSerializer):
         instance.save()
 
         response_data = {
-            "id": instance.id,
+            "id": AlphaId.encode(instance.id),
             "bsr_code": instance.bsr_code,
             "challan_no": instance.challan_no,
             "date_of_deposit": instance.date.strftime("%d-%b-%Y"),

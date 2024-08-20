@@ -5,6 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
+
+from accounts.models import User
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, \
     ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress, SalaryIncome, RentalIncome, BuyerDetails, \
     CapitalGains, BusinessIncome, AgricultureIncome, LandDetails, InterestIncome, InterestOnItRefunds, DividendIncome, \
@@ -187,18 +189,18 @@ class ImportIncomeTaxProfileDataApi(APIView):
         income_tax_profile, created = IncomeTaxProfile.objects.update_or_create(
             user=user,
             defaults={
-                'first_name': 'beyond',
-                'middle_name': 't',
-                'last_name': 'Tax',
+                'first_name': User.first_name,
+                'middle_name': '',
+                'last_name': User.last_name,
                 'date_of_birth': '2024-01-01',
                 'fathers_name': 'Father Beyondtax',
                 'gender': IncomeTaxProfile.MALE,
                 'marital_status': IncomeTaxProfile.Married,
                 'aadhar_no': '123456789012',
                 'aadhar_enrollment_no': '123456789012345678901234',
-                'pan_no': 'ABCDE1234F',
-                'mobile_number': '9876543210',
-                'email': 'johndoe@example.com',
+                'pan_no': IncomeTaxProfile.pan_no,
+                'mobile_number': User.mobile_number,
+                'email': User.email,
                 'residential_status': IncomeTaxProfile.IndianResident,
                 'is_data_imported': True
             }
@@ -293,6 +295,8 @@ class SalaryIncomeUpdateApi(generics.GenericAPIView):
                 item_dict['income_tax'] = income_tax_profile
                 item_dict['income_tax_return'] = income_tax_return
                 item_dict['upload_form_file'] = file
+                if 'id' in item_dict:
+                    item_dict['id'] = AlphaId.decode(item_dict['id'])
                 salary_income, created = SalaryIncome.objects.update_or_create(
                     income_tax=income_tax_profile,
                     income_tax_return=income_tax_return,
@@ -357,6 +361,9 @@ class RentalIncomeUpdateApi(generics.GenericAPIView):
         if isinstance(data, list):
             updated_ids = []
             for item in data:
+                if 'id' in item:
+                    item['id'] = AlphaId.decode(item['id'])
+
                 rental_income, created = RentalIncome.objects.update_or_create(
                     income_tax=income_tax_profile,
                     income_tax_return=income_tax_return,
@@ -364,7 +371,8 @@ class RentalIncomeUpdateApi(generics.GenericAPIView):
                     defaults=item
                 )
                 updated_ids.append(rental_income.id)
-            RentalIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
+            RentalIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+                id__in=updated_ids).delete()
             return Response({'status': 'success', 'message': 'Rental incomes updated successfully'}, status=status.HTTP_200_OK)
         else:
             return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of rental incomes'}, status=status.HTTP_400_BAD_REQUEST)
@@ -442,27 +450,27 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
             updated_ids = []
             for item in data:
                 buyers_data = item.pop('buyer_details', [])
-                item['income_tax'] = income_tax_profile.id
-                item['income_tax_return'] = income_tax_return.id
-                try:
-                    capital_gain = CapitalGains.objects.get(id=item.get('id'))
-                    serializer = self.get_serializer(capital_gain, data=item, partial=True)
-                except CapitalGains.DoesNotExist:
-                    serializer = self.get_serializer(data=item)
-                serializer.is_valid(raise_exception=True)
-                capital_gain = serializer.save()
+                if 'id' in item:
+                    item['id'] = AlphaId.decode(item['id'])
+                for buyer in buyers_data:
+                    if 'id' in buyer:
+                        buyer['id'] = AlphaId.decode(buyer['id'])
+
+                capital_gain, created = CapitalGains.objects.update_or_create(
+                    income_tax=income_tax_profile,
+                    income_tax_return=income_tax_return,
+                    id=item.get('id'),
+                    defaults=item
+                )
                 updated_ids.append(capital_gain.id)
 
                 buyer_ids = []
                 for buyer in buyers_data:
                     buyer['capital_gains'] = capital_gain.id
-                    try:
-                        buyer_detail = BuyerDetails.objects.get(id=buyer.get('id'))
-                        buyer_serializer = BuyerDetailsSerializer(buyer_detail, data=buyer, partial=True)
-                    except BuyerDetails.DoesNotExist:
-                        buyer_serializer = BuyerDetailsSerializer(data=buyer)
-                    buyer_serializer.is_valid(raise_exception=True)
-                    buyer_detail = buyer_serializer.save()
+                    buyer_detail, created = BuyerDetails.objects.update_or_create(
+                        id=buyer.get('id'),
+                        defaults=buyer
+                    )
                     buyer_ids.append(buyer_detail.id)
                 BuyerDetails.objects.filter(capital_gains=capital_gain).exclude(id__in=buyer_ids).delete()
             CapitalGains.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
@@ -516,6 +524,9 @@ class BusinessIncomeUpdateApi(generics.GenericAPIView):
         if isinstance(data, list):
             updated_ids = []
             for item in data:
+                if 'id' in item:
+                    item['id'] = AlphaId.decode(item['id'])
+
                 business_income, created = BusinessIncome.objects.update_or_create(
                     income_tax=income_tax_profile,
                     income_tax_return=income_tax_return,
@@ -523,10 +534,14 @@ class BusinessIncomeUpdateApi(generics.GenericAPIView):
                     defaults=item
                 )
                 updated_ids.append(business_income.id)
-            BusinessIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=updated_ids).delete()
-            return Response({'status': 'success', 'message': 'Business incomes updated successfully'}, status=status.HTTP_200_OK)
+            BusinessIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+                id__in=updated_ids).delete()
+            return Response({'status': 'success', 'message': 'Business incomes updated successfully'},
+                            status=status.HTTP_200_OK)
         else:
-            return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of business incomes'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'status': 'failure', 'message': 'Invalid data format, expected a list of business incomes'},
+                status=status.HTTP_400_BAD_REQUEST)
 
 
 class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
@@ -606,6 +621,9 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         agriculture_incomes_data = data.get('agriculture_incomes', [])
         agriculture_incomes_updated = []
         for item in agriculture_incomes_data:
+            if 'id' in item:
+                item['id'] = AlphaId.decode(item['id'])
+
             land_data = item.pop('land_details', [])
             agriculture_income, created = AgricultureIncome.objects.update_or_create(
                 income_tax=income_tax_profile,
@@ -615,6 +633,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
             )
             land_ids = []
             for land in land_data:
+                if 'id' in land:
+                    land['id'] = AlphaId.decode(land['id'])
                 land_detail, land_created = LandDetails.objects.update_or_create(
                     agriculture_income=agriculture_income,
                     id=land.get('id'),
@@ -628,6 +648,9 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         exempt_incomes_data = data.get('exempt_incomes', [])
         exempt_incomes_updated = []
         for item in exempt_incomes_data:
+            if 'id' in item:
+                item['id'] = AlphaId.decode(item['id'])
+
             exempt_income, created = ExemptIncome.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -636,7 +659,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
             )
             exempt_incomes_updated.append(ExemptIncomeSerializer(exempt_income).data)
         updated_records['exempt_incomes'] = exempt_incomes_updated
-        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records}, status=status.HTTP_200_OK)
+        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records},
+                        status=status.HTTP_200_OK)
 
 
 class OtherIncomesApi(generics.GenericAPIView):
@@ -734,11 +758,15 @@ class OtherIncomesApi(generics.GenericAPIView):
         data = request.data
 
         updated_records = {}
+
         interest_incomes_data = data.get('interest_incomes', [])
-        interest_ids = [item.get('id') for item in interest_incomes_data if item.get('id') is not None]
-        InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=interest_ids).delete()
+        interest_ids = [AlphaId.decode(item.get('id')) if 'id' in item else None for item in interest_incomes_data]
+        InterestIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+            id__in=interest_ids).delete()
         interest_incomes_updated = []
         for item in interest_incomes_data:
+            if 'id' in item:
+                item['id'] = AlphaId.decode(item['id'])
             interest_income, created = InterestIncome.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -749,10 +777,14 @@ class OtherIncomesApi(generics.GenericAPIView):
         updated_records['interest_incomes'] = interest_incomes_updated
 
         interest_on_it_refunds_data = data.get('interest_on_it_refunds', [])
-        it_refund_ids = [item.get('id') for item in interest_on_it_refunds_data if item.get('id') is not None]
-        InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=it_refund_ids).delete()
+        it_refund_ids = [AlphaId.decode(item.get('id')) if 'id' in item else None for item in
+                         interest_on_it_refunds_data]
+        InterestOnItRefunds.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+            id__in=it_refund_ids).delete()
         interest_on_it_refunds_updated = []
         for item in interest_on_it_refunds_data:
+            if 'id' in item:
+                item['id'] = AlphaId.decode(item['id'])
             interest_on_it_refund, created = InterestOnItRefunds.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -761,11 +793,15 @@ class OtherIncomesApi(generics.GenericAPIView):
             )
             interest_on_it_refunds_updated.append(InterestOnItRefundsSerializer(interest_on_it_refund).data)
         updated_records['interest_on_it_refunds'] = interest_on_it_refunds_updated
+
         dividend_incomes_data = data.get('dividend_incomes', [])
-        dividend_ids = [item.get('id') for item in dividend_incomes_data if item.get('id') is not None]
-        DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=dividend_ids).delete()
+        dividend_ids = [AlphaId.decode(item.get('id')) if 'id' in item else None for item in dividend_incomes_data]
+        DividendIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+            id__in=dividend_ids).delete()
         dividend_incomes_updated = []
         for item in dividend_incomes_data:
+            if 'id' in item:
+                item['id'] = AlphaId.decode(item['id'])
             dividend_income, created = DividendIncome.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -774,11 +810,15 @@ class OtherIncomesApi(generics.GenericAPIView):
             )
             dividend_incomes_updated.append(DividendIncomeSerializer(dividend_income).data)
         updated_records['dividend_incomes'] = dividend_incomes_updated
+
         income_from_betting_data = data.get('income_from_betting', [])
-        betting_ids = [item.get('id') for item in income_from_betting_data if item.get('id') is not None]
-        IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(id__in=betting_ids).delete()
+        betting_ids = [AlphaId.decode(item.get('id')) if 'id' in item else None for item in income_from_betting_data]
+        IncomeFromBetting.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
+            id__in=betting_ids).delete()
         income_from_betting_updated = []
         for item in income_from_betting_data:
+            if 'id' in item:
+                item['id'] = AlphaId.decode(item['id'])
             income_from_betting, created = IncomeFromBetting.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -788,7 +828,8 @@ class OtherIncomesApi(generics.GenericAPIView):
             income_from_betting_updated.append(IncomeFromBettingSerializer(income_from_betting).data)
         updated_records['income_from_betting'] = income_from_betting_updated
 
-        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records}, status=status.HTTP_200_OK)
+        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records},
+                        status=status.HTTP_200_OK)
 
 
 class TaxPaidApi(generics.GenericAPIView):
@@ -869,6 +910,8 @@ class TaxPaidApi(generics.GenericAPIView):
         updated_tds_ids = []
         for item in tds_data:
             item_dict = json.loads(item)
+            if 'id' in item_dict:
+                item_dict['id'] = AlphaId.decode(item_dict['id'])
             item_dict['income_tax'] = income_tax_profile
             item_dict['income_tax_return'] = income_tax_return
             tds_or_tcs_deduction, created = TdsOrTcsDeduction.objects.update_or_create(
@@ -885,6 +928,8 @@ class TaxPaidApi(generics.GenericAPIView):
         updated_self_assessment_ids = []
         for item_data, file in zip(self_assessment_data, files):
             item_data_dict = json.loads(item_data)
+            if 'id' in item_data_dict:
+                item_data_dict['id'] = AlphaId.decode(item_data_dict['id'])
             item_data_dict['income_tax'] = income_tax_profile
             item_data_dict['income_tax_return'] = income_tax_return
             item_data_dict['challan_pdf'] = file
