@@ -256,19 +256,19 @@ class SalaryIncomeListCreateApi(generics.ListCreateAPIView):
         data = request.data.getlist('data')
         files = request.FILES.getlist('files')
         if isinstance(data, list):
-
             created_incomes = []
             for item_data, file in zip(data, files):
                 item = eval(item_data)
-                item['income_tax'] = income_tax_profile.id
-                item['income_tax_return'] = income_tax_return.id
+                item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+                item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
                 item['upload_form_file'] = file
                 serializer = self.get_serializer(data=item)
                 serializer.is_valid(raise_exception=True)
                 salary_income = serializer.save()
                 created_incomes.append(serializer.data)
-            return Response({'status': 'success', 'message': 'Salary incomes created successfully', 'data': created_incomes},
-                            status=status.HTTP_201_CREATED)
+            return Response(
+                {'status': 'success', 'message': 'Salary incomes created successfully', 'data': created_incomes},
+                status=status.HTTP_201_CREATED)
         else:
             return Response({'status': 'failure', 'message': 'Invalid data format, expected a list of salary incomes'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -277,6 +277,7 @@ class SalaryIncomeListCreateApi(generics.ListCreateAPIView):
 class SalaryIncomeUpdateApi(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = SalaryIncomeSerializer
+    parser_classes = (MultiPartParser, FormParser)
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
@@ -291,7 +292,13 @@ class SalaryIncomeUpdateApi(generics.GenericAPIView):
         if isinstance(data, list):
             updated_ids = []
             for item_data, file in zip(data, files):
-                item_dict = json.loads(item_data)
+                try:
+                    item_dict = json.loads(item_data)
+                except json.JSONDecodeError as e:
+                    return Response(
+                        {'status': 'failure', 'message': 'Invalid JSON format in data'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 item_dict['income_tax'] = income_tax_profile
                 item_dict['income_tax_return'] = income_tax_return
                 item_dict['upload_form_file'] = file
@@ -335,8 +342,8 @@ class RentalIncomeListCreateApi(generics.ListCreateAPIView):
         if isinstance(data, list):
             created_incomes = []
             for item in data:
-                item['income_tax'] = income_tax_profile.id
-                item['income_tax_return'] = income_tax_return.id
+                item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+                item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
                 serializer = self.get_serializer(data=item)
                 serializer.is_valid(raise_exception=True)
                 rental_income = serializer.save()
@@ -400,8 +407,8 @@ class CapitalGainsListCreateApi(generics.ListCreateAPIView):
             data = [data]
         created_records = []
         for item in data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             asset_type = item.get('asset_type')
             term_type = item.get('term_type', None)
             if asset_type == CapitalGains.HouseProperty:
@@ -423,7 +430,7 @@ class CapitalGainsListCreateApi(generics.ListCreateAPIView):
             created_records.append(serializer.data)
             buyers_data = item.get('buyer_details', [])
             for buyer in buyers_data:
-                buyer['capital_gains'] = capital_gain.id
+                buyer['capital_gains'] = AlphaId.encode(capital_gain.id)
                 buyer_serializer = BuyerDetailsSerializer(data=buyer)
                 buyer_serializer.is_valid(raise_exception=True)
                 buyer_serializer.save()
@@ -452,9 +459,6 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
                 buyers_data = item.pop('buyer_details', [])
                 if 'id' in item:
                     item['id'] = AlphaId.decode(item['id'])
-                for buyer in buyers_data:
-                    if 'id' in buyer:
-                        buyer['id'] = AlphaId.decode(buyer['id'])
 
                 capital_gain, created = CapitalGains.objects.update_or_create(
                     income_tax=income_tax_profile,
@@ -466,13 +470,18 @@ class CapitalGainsUpdateApi(generics.GenericAPIView):
 
                 buyer_ids = []
                 for buyer in buyers_data:
-                    buyer['capital_gains'] = capital_gain.id
+                    if 'id' in buyer:
+                        buyer['id'] = AlphaId.decode(buyer['id'])
+                    buyer['capital_gains'] = capital_gain
+
                     buyer_detail, created = BuyerDetails.objects.update_or_create(
                         id=buyer.get('id'),
                         defaults=buyer
                     )
                     buyer_ids.append(buyer_detail.id)
+
                 BuyerDetails.objects.filter(capital_gains=capital_gain).exclude(id__in=buyer_ids).delete()
+
             CapitalGains.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return).exclude(
                 id__in=updated_ids).delete()
             return Response({'status': 'success', 'message': 'Capital gains and buyer details updated successfully'},
@@ -501,8 +510,8 @@ class BusinessIncomeListCreateApi(generics.ListCreateAPIView):
         data = request.data
         created_records = []
         for item in data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             serializer = self.get_serializer(data=item)
             serializer.is_valid(raise_exception=True)
             record = serializer.save()
@@ -607,7 +616,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
             exempt_income = exempt_serializer.save()
             exempt_incomes_created.append(exempt_serializer.data)
         created_records['exempt_incomes'] = exempt_incomes_created
-        return Response({'status': 'success', 'message': 'Incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
+        return Response({'status': 'success', 'message': 'Incomes created successfully', 'data': created_records},
+                        status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
@@ -697,8 +707,8 @@ class OtherIncomesApi(generics.GenericAPIView):
         interest_incomes_data = data.get('interest_incomes', [])
         interest_incomes_created = []
         for item in interest_incomes_data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item.pop('id', None)
 
             interest_serializer = InterestIncomeSerializer(data=item)
@@ -710,8 +720,8 @@ class OtherIncomesApi(generics.GenericAPIView):
         interest_on_it_refunds_data = data.get('interest_on_it_refunds', [])
         interest_on_it_refunds_created = []
         for item in interest_on_it_refunds_data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item.pop('id', None)
 
             interest_on_it_refunds_serializer = InterestOnItRefundsSerializer(data=item)
@@ -723,8 +733,8 @@ class OtherIncomesApi(generics.GenericAPIView):
         dividend_incomes_data = data.get('dividend_incomes', [])
         dividend_incomes_created = []
         for item in dividend_incomes_data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item.pop('id', None)
 
             dividend_serializer = DividendIncomeSerializer(data=item)
@@ -736,8 +746,8 @@ class OtherIncomesApi(generics.GenericAPIView):
         income_from_betting_data = data.get('income_from_betting', [])
         income_from_betting_created = []
         for item in income_from_betting_data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item.pop('id', None)
 
             betting_serializer = IncomeFromBettingSerializer(data=item)
@@ -871,8 +881,8 @@ class TaxPaidApi(generics.GenericAPIView):
         created_tds_records = []
         for item in tds_data:
             item_dict = json.loads(item)
-            item_dict['income_tax'] = income_tax_profile.id
-            item_dict['income_tax_return'] = income_tax_return.id
+            item_dict['income_tax'] = AlphaId.encode(income_tax_profile.id)  # Assign to item_dict
+            item_dict['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             serializer = TdsOrTcsDeductionSerializer(data=item_dict)
             serializer.is_valid(raise_exception=True)
             record = serializer.save()
@@ -881,8 +891,8 @@ class TaxPaidApi(generics.GenericAPIView):
         created_self_assessment_records = []
         for item_data, file in zip(self_assessment_data, files):
             item_data_dict = json.loads(item_data)
-            item_data_dict['income_tax'] = income_tax_profile.id
-            item_data_dict['income_tax_return'] = income_tax_return.id
+            item_data_dict['income_tax'] = AlphaId.encode(income_tax_profile.id)  # Assign to item_data_dict
+            item_data_dict['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item_data_dict['challan_pdf'] = file
             serializer = SelfAssesmentAndAdvanceTaxPaidSerializer(data=item_data_dict)
             serializer.is_valid(raise_exception=True)
@@ -973,8 +983,8 @@ class DeductionsApi(generics.GenericAPIView):
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
         data = request.data
-        data['income_tax'] = income_tax_profile.id
-        data['income_tax_return'] = income_tax_return.id
+        data['income_tax'] = AlphaId.encode(income_tax_profile.id)
+        data['income_tax_return'] = AlphaId.encode(income_tax_return.id)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         record = serializer.save()

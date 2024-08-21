@@ -66,6 +66,8 @@ class IncomeTaxProfileSerializer(BaseModelSerializer):
     def validate(self, data):
         if not data.get('aadhar_no') and not data.get('aadhar_enrollment_no'):
             raise serializers.ValidationError("Either 'aadhar_no' or 'aadhar_enrollment_no' must be provided.")
+        if 'pan_no' in data and self.instance and data['pan_no'] != self.instance.pan_no:
+            raise serializers.ValidationError("You are not allowed to update the PAN number.")
         return data
 
     def validate_date_of_birth(self, value):
@@ -80,10 +82,6 @@ class IncomeTaxProfileSerializer(BaseModelSerializer):
             raise serializers.ValidationError("Invalid type for date_of_birth")
 
     def update(self, instance, validated_data):
-
-        if 'pan_no' in validated_data and validated_data['pan_no'] != instance.pan_no:
-            validated_data['is_pan_verified'] = False
-            validated_data['is_data_imported'] = False
 
         bank_details_data = validated_data.pop('income_tax_bankdetails', [])
         address_data = validated_data.pop('address', None)
@@ -229,6 +227,10 @@ class RentalIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = RentalIncome
         fields = "__all__"
+        extra_kwargs = {
+            'standard_deduction': {'required': False},
+            'net_rental_income': {'required': False}
+        }
 
     def to_internal_value(self, data):
         if 'id' in data:

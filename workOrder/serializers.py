@@ -1,13 +1,14 @@
 from django.db.models import Sum
 from rest_framework import serializers
 from accounts.models import ServicePages
+from shared.libs.hashing import AlphaId
 from shared.rest.serializers import BaseModelSerializer, BaseSerializer
 from workOrder.models import WorkOrderDocument, WorkOrder, WorkOrderDownloadDocument, WorkorderPayment
 
 
 class WorkOrderSerializer(BaseModelSerializer):
     user = serializers.ReadOnlyField(source='user.id')
-    service_id = serializers.IntegerField(write_only=True)
+    service_id = serializers.CharField(write_only=True)
     service_name = serializers.SerializerMethodField()
     required_documents_list = serializers.SerializerMethodField()
 
@@ -26,11 +27,14 @@ class WorkOrderSerializer(BaseModelSerializer):
 
     def validate_service_id(self, value):
         try:
-            service = ServicePages.objects.get(id=value)
+            decoded_service_id = AlphaId.decode(value)
+            service = ServicePages.objects.get(id=decoded_service_id)
             self.context['service'] = service
         except ServicePages.DoesNotExist:
-            raise serializers.ValidationError(f"Service with ID {value} does not exist.")
-        return value
+            raise serializers.ValidationError(f"Service with ID {decoded_service_id} does not exist.")
+        except ValueError:
+            raise serializers.ValidationError("Invalid service ID format.")
+        return decoded_service_id
 
     def create(self, validated_data):
         validated_data['service'] = self.context.get('service')
@@ -61,7 +65,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
 
 class WorkOrderDocumentsUploadSerializer(BaseModelSerializer):
-    work_order_id = serializers.IntegerField(write_only=True)
+    work_order_id = serializers.CharField(write_only=True)
     documents = DocumentSerializer(many=True, write_only=True)
 
     class Meta:
