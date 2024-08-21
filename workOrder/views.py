@@ -45,7 +45,8 @@ class WorkOrderDocumentUploadAPI(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            work_order_id = request.data['work_order_id']
+            encoded_work_order_id  = request.data['work_order_id']
+            work_order_id = AlphaId.decode(encoded_work_order_id)
             work_order = WorkOrder.objects.get(id=work_order_id)
         except (KeyError, WorkOrder.DoesNotExist):
             return Response({"error": "Work order with the provided ID does not exist."},

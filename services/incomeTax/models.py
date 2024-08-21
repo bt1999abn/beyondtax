@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.text import slugify
@@ -189,10 +190,15 @@ class RentalIncome(abstract_models.BaseModel):
     ownership_percent = models.IntegerField()
 
     def save(self, *args, **kwargs):
-        self.standard_deduction = (self.annual_rent - self.property_tax_paid) * 0.3
+        annual_rent = Decimal(self.annual_rent)
+        property_tax_paid = Decimal(self.property_tax_paid)
+        interest_on_home_loan_dcp = Decimal(self.interest_on_home_loan_dcp)
+        interest_on_home_loan_pc = Decimal(self.interest_on_home_loan_pc)
+        decimal_0_3 = Decimal('0.3')
+        self.standard_deduction = (annual_rent - property_tax_paid) * decimal_0_3
         self.net_rental_income = (
-                self.annual_rent - self.property_tax_paid - self.standard_deduction -
-                self.interest_on_home_loan_dcp - self.interest_on_home_loan_pc
+                annual_rent - property_tax_paid - self.standard_deduction -
+                interest_on_home_loan_dcp - interest_on_home_loan_pc
         )
         super(RentalIncome, self).save(*args, **kwargs)
 
