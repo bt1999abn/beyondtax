@@ -156,6 +156,7 @@ class BaseModelSerializer(EncodeAlphaID, serializers.ModelSerializer):
         models.UUIDField: UUIDField,
         models.GenericIPAddressField: IPAddressField,
         models.FilePathField: FilePathField,
+        models.JSONField: serializers.JSONField,
     }
 
 

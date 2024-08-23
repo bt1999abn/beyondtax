@@ -186,21 +186,27 @@ class ImportIncomeTaxProfileDataApi(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
+        try:
+            income_tax_profile = IncomeTaxProfile.objects.get(user=user)
+            pan_no = income_tax_profile.pan_no
+        except IncomeTaxProfile.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Income Tax Profile does not exist for the user'},
+                            status=status.HTTP_404_NOT_FOUND)
         income_tax_profile, created = IncomeTaxProfile.objects.update_or_create(
             user=user,
             defaults={
-                'first_name': User.first_name,
+                'first_name': user.first_name,
                 'middle_name': '',
-                'last_name': User.last_name,
+                'last_name': user.last_name,
                 'date_of_birth': '2024-01-01',
                 'fathers_name': 'Father Beyondtax',
                 'gender': IncomeTaxProfile.MALE,
                 'marital_status': IncomeTaxProfile.Married,
                 'aadhar_no': '123456789012',
                 'aadhar_enrollment_no': '123456789012345678901234',
-                'pan_no': IncomeTaxProfile.pan_no,
-                'mobile_number': User.mobile_number,
-                'email': User.email,
+                'pan_no': pan_no,
+                'mobile_number': "9654327863",
+                'email': user.email,
                 'residential_status': IncomeTaxProfile.IndianResident,
                 'is_data_imported': True
             }
