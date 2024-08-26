@@ -306,20 +306,12 @@ class LandDetailsSerializer(BaseModelSerializer):
         fields = "__all__"
 
 
-class AgricultureIncomeSerializer(serializers.ModelSerializer):
+class AgricultureIncomeSerializer(BaseModelSerializer):
     land_details = LandDetailsSerializer(many=True, required=False)
 
     class Meta:
         model = AgricultureIncome
         fields = "__all__"
-
-    def to_internal_value(self, data):
-        if 'id' in data:
-            data['id'] = AlphaId.decode(data['id'])
-        for land in data.get('land_details', []):
-            if 'id' in land:
-                land['id'] = AlphaId.decode(land['id'])
-        return super().to_internal_value(data)
 
     def create(self, validated_data):
         land_details_data = validated_data.pop('land_details', [])
@@ -362,11 +354,6 @@ class ExemptIncomeSerializer(BaseModelSerializer):
     class Meta:
         model = ExemptIncome
         fields = "__all__"
-
-    def to_internal_value(self, data):
-        if 'id' in data:
-            data['id'] = AlphaId.decode(data['id'])
-        return super().to_internal_value(data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():

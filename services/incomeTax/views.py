@@ -186,27 +186,33 @@ class ImportIncomeTaxProfileDataApi(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
+        first_name = user.first_name or ''
+        last_name = user.last_name or ''
+        email = user.email or ''
+        date_of_birth = user.date_of_birth or None
+
         try:
             income_tax_profile = IncomeTaxProfile.objects.get(user=user)
             pan_no = income_tax_profile.pan_no
         except IncomeTaxProfile.DoesNotExist:
             return Response({'status': 'error', 'message': 'Income Tax Profile does not exist for the user'},
                             status=status.HTTP_404_NOT_FOUND)
+
         income_tax_profile, created = IncomeTaxProfile.objects.update_or_create(
             user=user,
             defaults={
-                'first_name': user.first_name,
+                'first_name': first_name,
                 'middle_name': '',
-                'last_name': user.last_name,
-                'date_of_birth': '2024-01-01',
+                'last_name': last_name,
+                'date_of_birth': date_of_birth,
                 'fathers_name': 'Father Beyondtax',
                 'gender': IncomeTaxProfile.MALE,
                 'marital_status': IncomeTaxProfile.Married,
                 'aadhar_no': '123456789012',
                 'aadhar_enrollment_no': '123456789012345678901234',
                 'pan_no': pan_no,
-                'mobile_number': "9654327863",
-                'email': user.email,
+                'mobile_number': '',
+                'email': email,
                 'residential_status': IncomeTaxProfile.IndianResident,
                 'is_data_imported': True
             }
@@ -214,31 +220,30 @@ class ImportIncomeTaxProfileDataApi(APIView):
         IncomeTaxBankDetails.objects.update_or_create(
             income_tax=income_tax_profile,
             defaults={
-                'account_no': '1234567890',
-                'ifsc_code': 'IFSC0001234',
-                'bank_name': 'Bank of Example',
+                'account_no': '',
+                'ifsc_code': '',
+                'bank_name': '',
                 'type': IncomeTaxBankDetails.SavingsAccount
             }
         )
+
         IncomeTaxAddress.objects.update_or_create(
             income_tax=income_tax_profile,
             defaults={
-                'door_no': '123',
-                'permise_name': 'Premise Name',
-                'street': 'Street Name',
-                'area': 'Area Name',
-                'city': 'City Name',
-                'state': 'State Name',
-                'pincode': '123456',
-                'country': 'Country Name'
+                'door_no': '',
+                'permise_name': '',
+                'street': '',
+                'area': '',
+                'city': '',
+                'state': '',
+                'pincode': '',
+                'country': ''
             }
         )
-        if created:
-            message = 'Tax profile data created successfully'
-        else:
-            message = 'Tax profile data updated successfully'
 
-        return Response({'status': 'success', 'message': message, 'is_data_imported': True}, status=status.HTTP_201_CREATED)
+        message = 'Tax profile data created successfully' if created else 'Tax profile data updated successfully'
+        return Response({'status': 'success', 'message': message, 'is_data_imported': True},
+                        status=status.HTTP_201_CREATED)
 
 
 class SalaryIncomeListCreateApi(generics.ListCreateAPIView):
@@ -567,12 +572,12 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         user = self.request.user
         encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
-        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
         income_tax_profile = IncomeTaxProfile.objects.get(user=user)
         income_tax_return = IncomeTaxReturn.objects.get(id=income_tax_return_id, user=user)
 
         agriculture_incomes = AgricultureIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
         exempt_incomes = ExemptIncome.objects.filter(income_tax=income_tax_profile, income_tax_return=income_tax_return)
+
         data = {
             'agriculture_incomes': AgricultureIncomeSerializer(agriculture_incomes, many=True).data,
             'exempt_incomes': ExemptIncomeSerializer(exempt_incomes, many=True).data
@@ -592,8 +597,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         agriculture_incomes_created = []
         for item in agriculture_incomes_data:
             land_data = item.pop('land_details', [])
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item.pop('id', None)
 
             agriculture_serializer = AgricultureIncomeSerializer(data=item)
@@ -602,7 +607,7 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
             agriculture_incomes_created.append(agriculture_serializer.data)
 
             for land in land_data:
-                land['agriculture_income'] = agriculture_income.id
+                land['agriculture_income'] = AlphaId.encode(agriculture_income.id)
                 land.pop('id', None)
                 land_serializer = LandDetailsSerializer(data=land)
                 land_serializer.is_valid(raise_exception=True)
@@ -614,16 +619,15 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         exempt_incomes_data = data.get('exempt_incomes', [])
         exempt_incomes_created = []
         for item in exempt_incomes_data:
-            item['income_tax'] = income_tax_profile.id
-            item['income_tax_return'] = income_tax_return.id
+            item['income_tax'] = AlphaId.encode(income_tax_profile.id)
+            item['income_tax_return'] = AlphaId.encode(income_tax_return.id)
             item.pop('id', None)
             exempt_serializer = ExemptIncomeSerializer(data=item)
             exempt_serializer.is_valid(raise_exception=True)
             exempt_income = exempt_serializer.save()
             exempt_incomes_created.append(exempt_serializer.data)
         created_records['exempt_incomes'] = exempt_incomes_created
-        return Response({'status': 'success', 'message': 'Incomes created successfully', 'data': created_records},
-                        status=status.HTTP_201_CREATED)
+        return Response({'status': 'success', 'message': 'Agriculture And Exempt Incomes created successfully', 'data': created_records}, status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
         user = self.request.user
@@ -637,10 +641,8 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         agriculture_incomes_data = data.get('agriculture_incomes', [])
         agriculture_incomes_updated = []
         for item in agriculture_incomes_data:
-            if 'id' in item:
-                item['id'] = AlphaId.decode(item['id'])
-
             land_data = item.pop('land_details', [])
+            item['id'] = AlphaId.decode(item.get('id'))
             agriculture_income, created = AgricultureIncome.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -649,8 +651,7 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
             )
             land_ids = []
             for land in land_data:
-                if 'id' in land:
-                    land['id'] = AlphaId.decode(land['id'])
+                land['id'] = AlphaId.decode(land.get('id'))
                 land_detail, land_created = LandDetails.objects.update_or_create(
                     agriculture_income=agriculture_income,
                     id=land.get('id'),
@@ -664,9 +665,7 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
         exempt_incomes_data = data.get('exempt_incomes', [])
         exempt_incomes_updated = []
         for item in exempt_incomes_data:
-            if 'id' in item:
-                item['id'] = AlphaId.decode(item['id'])
-
+            item['id'] = AlphaId.decode(item.get('id'))
             exempt_income, created = ExemptIncome.objects.update_or_create(
                 income_tax=income_tax_profile,
                 income_tax_return=income_tax_return,
@@ -675,8 +674,7 @@ class AgricultureAndExemptIncomeApi(generics.GenericAPIView):
             )
             exempt_incomes_updated.append(ExemptIncomeSerializer(exempt_income).data)
         updated_records['exempt_incomes'] = exempt_incomes_updated
-        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records},
-                        status=status.HTTP_200_OK)
+        return Response({'status': 'success', 'message': 'Incomes updated successfully', 'data': updated_records}, status=status.HTTP_200_OK)
 
 
 class OtherIncomesApi(generics.GenericAPIView):
