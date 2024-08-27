@@ -5,7 +5,7 @@ from shared.rest.serializers import BaseModelSerializer
 class BlogPostSerializer(BaseModelSerializer):
     class Meta:
         model = BlogPost
-        exclude = ['id','content']
+        exclude = ['content']
 
 
 class BlogPostDetailSerializer(BaseModelSerializer):

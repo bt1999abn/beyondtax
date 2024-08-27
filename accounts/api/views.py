@@ -151,9 +151,9 @@ class UpdateProfileApi(APIView):
 
                 user.profile_picture = profile_picture
                 user.save()
-
             serializer.save()
-            return Response({"message": "Profile updated successfully."}, status=status.HTTP_200_OK)
+            updated_user_data = UserProfileSerializer(user, context={'request': request}).data
+            return Response({"message": "Profile updated successfully.", "data": updated_user_data}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

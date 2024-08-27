@@ -1,3 +1,6 @@
+import base64
+
+from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from blogs.models import BlogPost
@@ -25,6 +28,15 @@ class GetBlogPostApi(ListAPIView):
 
 
 class BlogPostDetailApi(RetrieveAPIView):
-    queryset = BlogPost.objects.all()
     serializer_class = BlogPostDetailSerializer
 
+    def get_object(self):
+        encoded_pk = self.kwargs.get('pk')
+
+        try:
+            decoded_pk = AlphaId.decode(encoded_pk)
+        except ValueError:
+            raise NotFound("Invalid encoded ID.")
+
+        blog_post = get_object_or_404(BlogPost, pk=decoded_pk)
+        return blog_post
