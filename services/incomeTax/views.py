@@ -1,5 +1,6 @@
 import json
 from django.db.models import Sum
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -17,9 +18,12 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     InterestOnItRefundsSerializer, DividendIncomeSerializer, IncomeFromBettingSerializer, TdsOrTcsDeductionSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
     LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer, \
-    TdsPdfSerializer, ChallanPdfUploadSerializer, AISPdfUploadSerializer
+    TdsPdfSerializer, ChallanPdfUploadSerializer, AISPdfUploadSerializer, IncomeTaxReturnYearSerializer, \
+    ReportsPageSerializer, ReportsPageGraphDataSerializer, TaxSummarySerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+from services.incomeTax.utils import IncomeTaxCurrentYear
 from shared.libs.hashing import AlphaId
 
 
@@ -1234,3 +1238,131 @@ class ChallanUploadApi(generics.CreateAPIView):
         updated_data = serializer.update(instance=challan_instance, validated_data=request.data)
 
         return Response({"message": "Data updated successfully", "data": updated_data}, status=status.HTTP_200_OK)
+
+
+class ReportsPageAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        income_tax_return_year_name = self.kwargs.get('income_tax_return_year_name', None)
+
+        if income_tax_return_year_name:
+            income_tax_return_year = get_object_or_404(IncomeTaxReturnYears, name=income_tax_return_year_name)
+            income_tax_return = get_object_or_404(
+                IncomeTaxReturn,
+                user=user,
+                income_tax_return_year=income_tax_return_year
+            )
+            specific_year_data = ReportsPageSerializer(income_tax_return).data
+
+            return Response(specific_year_data, status=status.HTTP_200_OK)
+        else:
+            current_year_obj = IncomeTaxCurrentYear().get_current_income_tax_return_year()
+            if not current_year_obj:
+                return Response({"error": "No current year found"}, status=status.HTTP_404_NOT_FOUND)
+            current_income_tax_return = IncomeTaxReturn.objects.filter(
+                user=user, income_tax_return_year=current_year_obj).first()
+            graph_income_tax_returns = IncomeTaxReturn.objects.filter(user=user).select_related(
+                'income_tax_return_year', 'user__income_tax_profile')
+
+            graph_data = ReportsPageGraphDataSerializer(graph_income_tax_returns, many=True).data
+
+            current_year_data = ReportsPageSerializer(current_income_tax_return).data
+
+            response_data = {
+                "income_tax_return_year_data": current_year_data,
+                "graph_data": graph_data
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+
+
+class IncomeTaxReturnYearListAPIView(generics.ListAPIView):
+    queryset = IncomeTaxReturnYears.objects.all()
+    serializer_class = IncomeTaxReturnYearSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class Download26ASAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        income_tax_return_year_name = self.kwargs['income_tax_return_year_name']
+
+        income_tax_return = get_object_or_404(
+            IncomeTaxReturn,
+            user=user,
+            income_tax_return_year__name=income_tax_return_year_name
+        )
+        form_26as_file_path = income_tax_return.tds_pdf.path if income_tax_return.tds_pdf else None
+
+        if not form_26as_file_path:
+            raise Http404("Form 26AS file not found for this year.")
+
+        response = FileResponse(
+            open(form_26as_file_path, 'rb'),
+            as_attachment=True,
+            filename=f'Form26AS_{income_tax_return_year_name}.pdf'
+        )
+        return response
+
+
+class DownloadAISAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        income_tax_return_year_name = self.kwargs['income_tax_return_year_name']
+        income_tax_return = get_object_or_404(
+            IncomeTaxReturn,
+            user=user,
+            income_tax_return_year__name=income_tax_return_year_name
+        )
+        ais_pdf_path = income_tax_return.ais_pdf.path if income_tax_return.ais_pdf else None
+
+        if not ais_pdf_path:
+            raise Http404("AIS file not found for this year.")
+
+        response = FileResponse(
+            open(ais_pdf_path, 'rb'),
+            as_attachment=True,
+            filename=f'AIS_{income_tax_return_year_name}.pdf'
+        )
+        return response
+
+
+class DownloadTISAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        income_tax_return_year_name = self.kwargs['income_tax_return_year_name']
+        income_tax_return = get_object_or_404(
+            IncomeTaxReturn,
+            user=user,
+            income_tax_return_year__name=income_tax_return_year_name
+        )
+        tis_pdf_path = income_tax_return.tis_pdf.path if income_tax_return.tis_pdf else None
+
+        if not tis_pdf_path:
+            raise Http404("TIS file not found for this year.")
+
+        response = FileResponse(
+            open(tis_pdf_path, 'rb'),
+            as_attachment=True,
+            filename=f'TIS_{income_tax_return_year_name}.pdf'
+        )
+        return response
+
+
+class TaxRefundAPIView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TaxSummarySerializer
+
+    def get(self, request, *args, **kwargs):
+        encoded_income_tax_return_id = self.kwargs.get('income_tax_return_id')
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+        current_income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=request.user)
+        serializer = self.get_serializer(current_income_tax_return)
+        return Response(serializer.data, status=200)

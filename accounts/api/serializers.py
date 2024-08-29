@@ -8,7 +8,7 @@ from django_filters import rest_framework as filters
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord
-from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturnYears
+from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturnYears, IncomeTaxReturn
 from shared.libs.hashing import AlphaId
 from shared.rest.serializers import BaseSerializer, BaseModelSerializer
 
@@ -42,7 +42,7 @@ class LoginSerializer(BaseSerializer):
                 raise serializers.ValidationError("User does not exist.")
             user = authenticate(username=email_or_mobile, password=password)
             if not user:
-                raise serializers.ValidationError("Invalid credetials.")
+                raise serializers.ValidationError("Invalid credentials.")
         attrs['user'] = user
         return attrs
 
@@ -54,15 +54,18 @@ class LoginSerializer(BaseSerializer):
             pan_no = income_tax_profile.pan_no if income_tax_profile else None
         except IncomeTaxProfile.DoesNotExist:
             pan_no = None
-
         current_date = date.today()
         try:
             current_year_record = IncomeTaxReturnYears.objects.get(
                 start_date__lte=current_date, end_date__gte=current_date
             )
-            current_year_id = AlphaId.encode(current_year_record.id)
+            current_income_tax_return = IncomeTaxReturn.objects.get(
+                user=user, income_tax_return_year=current_year_record
+            )
+            current_income_tax_return_id = AlphaId.encode(current_income_tax_return.id)
         except ObjectDoesNotExist:
-            current_year_id = None
+            current_income_tax_return_id = None
+
         return {
             'id': AlphaId.encode(user.id),
             'full_name': full_name,
@@ -74,7 +77,7 @@ class LoginSerializer(BaseSerializer):
             'contact_person': user.contact_person,
             'business_name': user.business_name,
             'profile_picture': user.profile_picture.url if user.profile_picture else None,
-            'current_income_tax_return_year_id': current_year_id
+            'current_income_tax_return_id': current_income_tax_return_id,
         }
 
 

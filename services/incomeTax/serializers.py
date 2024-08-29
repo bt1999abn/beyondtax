@@ -2,6 +2,7 @@ import re
 from datetime import datetime, date
 import fitz
 from django.core.validators import RegexValidator
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxBankDetails, IncomeTaxAddress, IncomeTaxReturnYears, \
@@ -849,3 +850,172 @@ class ChallanPdfUploadSerializer(BaseSerializer):
         challan_pdf = validated_data.get('challan_pdf')
         extracted_data = self.extract_challan_details_from_pdf(challan_pdf)
         return self.update_extracted_data(instance, extracted_data, challan_pdf)
+
+
+class ReportsPageGraphDataSerializer(BaseModelSerializer):
+    total_income_earned = serializers.SerializerMethodField()
+    total_tax_paid = serializers.SerializerMethodField()
+    income_tax_return_year_name = serializers.CharField(source='income_tax_return_year.name')
+
+    class Meta:
+        model = IncomeTaxReturn
+        fields = ['income_tax_return_year_name', 'total_income_earned', 'total_tax_paid']
+
+    def get_total_income_earned(self, obj):
+        total_salary_income = SalaryIncome.objects.filter(income_tax_return=obj).aggregate(total=Sum('gross_salary'))['total'] or 0
+        total_rental_income = RentalIncome.objects.filter(income_tax_return=obj).aggregate(total=Sum('net_rental_income'))['total'] or 0
+        total_capital_gains = CapitalGains.objects.filter(income_tax_return=obj).aggregate(total=Sum('gain_or_loss'))['total'] or 0
+        total_business_income = BusinessIncome.objects.filter(income_tax_return=obj).aggregate(total=Sum('gross_receipt_cheq_neft_rtgs_profit') + Sum('gross_receipt_cash_upi_profit'))['total'] or 0
+        total_agriculture_income = AgricultureIncome.objects.filter(income_tax_return=obj).aggregate(total=Sum('gross_recipts'))['total'] or 0
+        total_exempt_income = ExemptIncome.objects.filter(income_tax_return=obj).aggregate(total=Sum('amount'))['total'] or 0
+        total_income = (total_salary_income + total_rental_income + total_capital_gains +
+                        total_business_income + total_agriculture_income + total_exempt_income)
+        return total_income
+
+    def get_total_tax_paid(self, obj):
+        total_tds_or_tcs_amount = TdsOrTcsDeduction.objects.filter(income_tax_return=obj).aggregate(total=Sum('tds_or_tcs_amount'))['total'] or 0
+        total_self_assessment_amount = SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax_return=obj).aggregate(total=Sum('amount'))['total'] or 0
+        total_taxes_paid = total_tds_or_tcs_amount + total_self_assessment_amount
+        return total_taxes_paid
+
+
+class ReportsPageSerializer(BaseModelSerializer):
+    total_income_earned = serializers.SerializerMethodField()
+    total_tax_paid = serializers.SerializerMethodField()
+    is_pan_verified = serializers.BooleanField(source='user.income_tax_profile.is_pan_verified')
+    income_tax_return_year_name = serializers.CharField(source='income_tax_return_year.name')
+    ais_pdf_url = serializers.FileField(source='ais_pdf')
+    tds_pdf_url = serializers.FileField(source='tds_pdf')
+    tis_pdf_url = serializers.FileField(source='tis_pdf')
+    income_tax_return_status = serializers.CharField(source='get_status_display')
+    contribution_percentage = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IncomeTaxReturn
+        fields = [
+            'income_tax_return_year_name', 'total_income_earned', 'total_tax_paid', 'is_pan_verified',
+            'income_tax_return_status', 'ais_pdf_url', 'tds_pdf_url', 'tis_pdf_url', 'contribution_percentage'
+        ]
+
+    def get_total_income_earned(self, obj):
+        return ReportsPageGraphDataSerializer().get_total_income_earned(obj)
+
+    def get_total_tax_paid(self, obj):
+        return ReportsPageGraphDataSerializer().get_total_tax_paid(obj)
+
+    def get_contribution_percentage(self, obj):
+        total_income = self.get_total_income_earned(obj)
+        total_taxes_paid = self.get_total_tax_paid(obj)
+        if total_income == 0:
+            return 0
+        contribution_percentage = (total_taxes_paid / total_income) * 100
+        return round(contribution_percentage, 2)
+
+
+class TaxSummarySerializer(BaseModelSerializer):
+    old_regime = serializers.SerializerMethodField()
+    new_regime = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IncomeTaxReturn
+        fields = ['old_regime', 'new_regime']
+
+    def get_old_regime(self, obj):
+        old_income_tax_return = self.get_previous_year_return(obj)
+        if old_income_tax_return:
+            return self.calculate_tax_summary(old_income_tax_return)
+        else:
+            return self.get_empty_old_regime_data()
+
+    def get_new_regime(self, obj):
+        return self.calculate_tax_summary(obj)
+
+    def get_previous_year_return(self, current_income_tax_return):
+        """Retrieve the previous year's income tax return."""
+        previous_year = current_income_tax_return.income_tax_return_year.start_date.year - 1
+        return IncomeTaxReturn.objects.filter(
+            user=current_income_tax_return.user,
+            income_tax_return_year__start_date__year=previous_year
+        ).first()
+
+    def get_empty_old_regime_data(self):
+        return {
+            'income_sources': {
+                'salary_income': 0,
+                'rental_income': 0,
+                'capital_gains': 0,
+                'business_income': 0,
+                'agriculture_and_exempt_income': 0,
+                'other_income': 0
+            },
+            'gross_total_income': 0,
+            'deductions': 0,
+            'total_income': 0,
+            'tax_on_total_income': 0,
+            'interest_and_penalties': 0,
+            'taxes_paid': 0,
+            'tax_payable_or_refund': 0
+        }
+
+    def calculate_tax_summary(self, income_tax_return):
+        total_salary_income = SalaryIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gross_salary'))['total'] or 0
+        total_rental_income = RentalIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('net_rental_income'))['total'] or 0
+        total_capital_gains = CapitalGains.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gain_or_loss'))['total'] or 0
+        total_business_income = BusinessIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gross_receipt_cheq_neft_rtgs_profit') + Sum('gross_receipt_cash_upi_profit'))['total'] or 0
+        total_agriculture_income = AgricultureIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('gross_recipts'))['total'] or 0
+        total_exempt_income = ExemptIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_interest_income = InterestIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('interest_amount'))['total'] or 0
+        total_it_refunds = InterestOnItRefunds.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_dividend_income = DividendIncome.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_betting_income = IncomeFromBetting.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+
+        total_others_income = total_interest_income + total_it_refunds + total_dividend_income + total_betting_income
+
+        gross_total_income = (total_salary_income + total_rental_income + total_capital_gains +
+                              total_business_income + total_agriculture_income + total_exempt_income + total_others_income)
+
+        deductions = Deductions.objects.filter(income_tax_return=income_tax_return).first()
+        total_deductions = (
+            deductions.life_insurance + deductions.provident_fund + deductions.elss_mutual_fund +
+            deductions.home_loan_repayment + deductions.tution_fees + deductions.stamp_duty_paid +
+            deductions.others + deductions.contribution_by_self + deductions.contribution_by_employeer +
+            deductions.medical_insurance_self + deductions.medical_preventive_health_checkup_self +
+            deductions.medical_expenditure_self + deductions.medical_insurance_parents +
+            deductions.medical_preventive_health_checkup_parents + deductions.medical_expenditure_parents +
+            deductions.education_loan + deductions.electronic_vehicle_loan + deductions.home_loan_amount +
+            deductions.interest_income + deductions.royality_on_books + deductions.income_on_patients +
+            deductions.income_on_bio_degradable + deductions.rent_paid + deductions.contribution_to_agnipath +
+            deductions.donation_to_political_parties + deductions.donation_others
+        ) if deductions else 0
+
+        total_income = gross_total_income - total_deductions
+        total_tds_or_tcs_amount = TdsOrTcsDeduction.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('tds_or_tcs_amount'))['total'] or 0
+        total_self_assessment_amount = SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax_return=income_tax_return).aggregate(total=Sum('amount'))['total'] or 0
+        total_taxes_paid = total_tds_or_tcs_amount + total_self_assessment_amount
+        tax_on_total_income = self.calculate_tax_on_total_income(total_income)
+        interest_and_penalties = self.calculate_interest_and_penalties(total_income)
+        tax_payable_or_refund = total_income - tax_on_total_income - interest_and_penalties - total_taxes_paid
+
+        return {
+            'income_sources': {
+                'salary_income': total_salary_income,
+                'rental_income': total_rental_income,
+                'capital_gains': total_capital_gains,
+                'business_income': total_business_income,
+                'agriculture_and_exempt_income': total_agriculture_income,
+                'other_income': total_others_income
+            },
+            'gross_total_income': gross_total_income,
+            'deductions': total_deductions,
+            'total_income': total_income,
+            'tax_on_total_income': tax_on_total_income,
+            'interest_and_penalties': interest_and_penalties,
+            'taxes_paid': total_taxes_paid,
+            'tax_payable_or_refund': tax_payable_or_refund
+        }
+
+    def calculate_tax_on_total_income(self, total_income):
+        return 0
+
+    def calculate_interest_and_penalties(self, total_income):
+        return 0

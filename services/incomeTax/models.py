@@ -100,6 +100,8 @@ class IncomeTaxReturn(abstract_models.BaseModel):
     status = models.IntegerField(choices=STATUS_CHOICES, blank=True, default=1)
     ais_pdf = models.FileField(upload_to='ais_documents/', blank=True)
     tds_pdf = models.FileField(upload_to='26as_documents/', blank=True)
+    tis_pdf = models.FileField(upload_to='tis_documents/', blank=True)
+
     def get_status_display(self):
         return dict(self.STATUS_CHOICES).get(self.status, 'Unknown')
 
