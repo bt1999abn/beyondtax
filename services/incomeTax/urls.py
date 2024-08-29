@@ -5,7 +5,8 @@ from .views import IncomeTaxProfileApi, ListIncomeTaxReturnsView, ResidentialSta
     RentalIncomeUpdateApi, CapitalGainsListCreateApi, CapitalGainsUpdateApi, \
     BusinessIncomeListCreateApi, BusinessIncomeUpdateApi, DeductionsApi, AgricultureAndExemptIncomeApi, OtherIncomesApi, \
     TaxPaidApi, TotalIncomeGetAPIView, TotalSummaryGetAPI, TdsPdfUploadApi, ChallanUploadApi, \
-    AISPdfUploadApi
+    AISPdfUploadApi, IncomeTaxReturnYearListAPIView, Download26ASAPIView, \
+    DownloadAISAPIView, ReportsPageAPIView, DownloadTISAPIView, TaxRefundAPIView
 
 urlpatterns = [
     path('create-incometax-profile/', IncomeTaxProfileApi.as_view(), name='create-incometax-profile'),
@@ -43,4 +44,11 @@ urlpatterns = [
     path('upload-26as-pdf/<str:income_tax_return_id>/', TdsPdfUploadApi.as_view(), name='upload-26as-pdf'),
     path('upload-challan-pdf/<str:income_tax_return_id>/', ChallanUploadApi.as_view(), name='upload-challan-pdf'),
     path('update-challan-pdf/<str:income_tax_return_id>/', ChallanUploadApi.as_view(), name='update-challan-pdf'),
+    path('reports-page/', ReportsPageAPIView.as_view(), name='reports-page'),
+    path('reports-page/<str:income_tax_return_year_name>/', ReportsPageAPIView.as_view(), name='reports-specific-year'),
+    path('income-tax-return-years/', IncomeTaxReturnYearListAPIView.as_view(), name='income-tax-return-years'),
+    path('download-26as/<str:income_tax_return_year_name>/', Download26ASAPIView.as_view(), name='download-26as'),
+    path('download-ais/<str:income_tax_return_year_name>/', DownloadAISAPIView.as_view(), name='download-ais'),
+    path('download-tis/<str:income_tax_return_year_name>/', DownloadTISAPIView.as_view(), name='download-tis'),
+    path('tax-refund/<str:income_tax_return_id>/', TaxRefundAPIView.as_view(), name='tax-refund'),
 ]
