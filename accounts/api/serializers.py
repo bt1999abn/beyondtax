@@ -1,5 +1,4 @@
 from datetime import date
-
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ObjectDoesNotExist
@@ -63,8 +62,10 @@ class LoginSerializer(BaseSerializer):
                 user=user, income_tax_return_year=current_year_record
             )
             current_income_tax_return_id = AlphaId.encode(current_income_tax_return.id)
+            current_income_tax_return_year_name = current_income_tax_return.income_tax_return_year.name
         except ObjectDoesNotExist:
             current_income_tax_return_id = None
+            current_income_tax_return_year_name = None
 
         return {
             'id': AlphaId.encode(user.id),
@@ -78,6 +79,7 @@ class LoginSerializer(BaseSerializer):
             'business_name': user.business_name,
             'profile_picture': user.profile_picture.url if user.profile_picture else None,
             'current_income_tax_return_id': current_income_tax_return_id,
+            'current_income_tax_return_year_name': current_income_tax_return_year_name,
         }
 
 
