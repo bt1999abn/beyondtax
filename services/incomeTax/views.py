@@ -1,4 +1,5 @@
 import json
+from urllib.parse import unquote
 from django.db.models import Sum
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
@@ -6,7 +7,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
-
 from accounts.models import User
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, \
     ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress, SalaryIncome, RentalIncome, BuyerDetails, \
@@ -1288,24 +1288,18 @@ class Download26ASAPIView(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_year_name = self.kwargs['income_tax_return_year_name']
-
+        income_tax_return_year_name = unquote(self.kwargs['income_tax_return_year_name'])
         income_tax_return = get_object_or_404(
             IncomeTaxReturn,
             user=user,
             income_tax_return_year__name=income_tax_return_year_name
         )
-        form_26as_file_path = income_tax_return.tds_pdf.path if income_tax_return.tds_pdf else None
-
-        if not form_26as_file_path:
+        form_26as_pdf = income_tax_return.tds_pdf
+        if not form_26as_pdf:
             raise Http404("Form 26AS file not found for this year.")
+        pdf_url = request.build_absolute_uri(form_26as_pdf.url)
 
-        response = FileResponse(
-            open(form_26as_file_path, 'rb'),
-            as_attachment=True,
-            filename=f'Form26AS_{income_tax_return_year_name}.pdf'
-        )
-        return response
+        return Response({"26as_pdf_url": pdf_url})
 
 
 class DownloadAISAPIView(generics.GenericAPIView):
@@ -1313,23 +1307,18 @@ class DownloadAISAPIView(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_year_name = self.kwargs['income_tax_return_year_name']
+        income_tax_return_year_name = unquote(self.kwargs['income_tax_return_year_name'])
         income_tax_return = get_object_or_404(
             IncomeTaxReturn,
             user=user,
             income_tax_return_year__name=income_tax_return_year_name
         )
-        ais_pdf_path = income_tax_return.ais_pdf.path if income_tax_return.ais_pdf else None
-
-        if not ais_pdf_path:
+        ais_pdf = income_tax_return.ais_pdf
+        if not ais_pdf:
             raise Http404("AIS file not found for this year.")
+        pdf_url = request.build_absolute_uri(ais_pdf.url)
 
-        response = FileResponse(
-            open(ais_pdf_path, 'rb'),
-            as_attachment=True,
-            filename=f'AIS_{income_tax_return_year_name}.pdf'
-        )
-        return response
+        return Response({"ais_pdf_url": pdf_url})
 
 
 class DownloadTISAPIView(generics.GenericAPIView):
@@ -1337,23 +1326,18 @@ class DownloadTISAPIView(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         user = self.request.user
-        income_tax_return_year_name = self.kwargs['income_tax_return_year_name']
+        income_tax_return_year_name = unquote(self.kwargs['income_tax_return_year_name'])
         income_tax_return = get_object_or_404(
             IncomeTaxReturn,
             user=user,
             income_tax_return_year__name=income_tax_return_year_name
         )
-        tis_pdf_path = income_tax_return.tis_pdf.path if income_tax_return.tis_pdf else None
-
-        if not tis_pdf_path:
+        tis_pdf = income_tax_return.tis_pdf
+        if not tis_pdf:
             raise Http404("TIS file not found for this year.")
+        pdf_url = request.build_absolute_uri(tis_pdf.url)
 
-        response = FileResponse(
-            open(tis_pdf_path, 'rb'),
-            as_attachment=True,
-            filename=f'TIS_{income_tax_return_year_name}.pdf'
-        )
-        return response
+        return Response({"pdf_url": pdf_url})
 
 
 class TaxRefundAPIView(generics.GenericAPIView):
