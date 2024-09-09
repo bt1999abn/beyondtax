@@ -50,7 +50,7 @@ class LoginSerializer(BaseSerializer):
         full_name = f"{user.first_name} {user.last_name or ''}".strip()
         try:
             income_tax_profile = user.income_tax_profile
-            pan_no = income_tax_profile.pan_no if income_tax_profile else None
+            pan_no = income_tax_profile.pan_no.upper() if income_tax_profile else None
         except IncomeTaxProfile.DoesNotExist:
             pan_no = None
         current_date = date.today()

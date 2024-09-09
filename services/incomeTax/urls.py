@@ -6,7 +6,8 @@ from .views import IncomeTaxProfileApi, ListIncomeTaxReturnsView, ResidentialSta
     BusinessIncomeListCreateApi, BusinessIncomeUpdateApi, DeductionsApi, AgricultureAndExemptIncomeApi, OtherIncomesApi, \
     TaxPaidApi, TotalIncomeGetAPIView, TotalSummaryGetAPI, TdsPdfUploadApi, ChallanUploadApi, \
     AISPdfUploadApi, IncomeTaxReturnYearListAPIView, Download26ASAPIView, \
-    DownloadAISAPIView, ReportsPageAPIView, DownloadTISAPIView, TaxRefundAPIView
+    DownloadAISAPIView, ReportsPageAPIView, DownloadTISAPIView, TaxRefundAPIView, ComputationsOldRegimeApi, \
+    ComputationsNewRegimeApi, SummaryPageApi, ComputationsCreateApi, ComputationsUpdateApi
 
 urlpatterns = [
     path('create-incometax-profile/', IncomeTaxProfileApi.as_view(), name='create-incometax-profile'),
@@ -51,4 +52,9 @@ urlpatterns = [
     path('download-ais/<str:income_tax_return_year_name>/', DownloadAISAPIView.as_view(), name='download-ais'),
     path('download-tis/<str:income_tax_return_year_name>/', DownloadTISAPIView.as_view(), name='download-tis'),
     path('tax-refund/<str:income_tax_return_id>/', TaxRefundAPIView.as_view(), name='tax-refund'),
+    path('computations-old-regime/<str:income_tax_return_id>/', ComputationsOldRegimeApi.as_view(), name='computations-old-regime'),
+    path('computations-new-regime/<str:income_tax_return_id>/', ComputationsNewRegimeApi.as_view(), name='computations-new-regime'),
+    path('tax-summary/<str:income_tax_return_id>/', SummaryPageApi.as_view(), name='tax-summary'),
+    path('computations/<str:income_tax_return_id>/', ComputationsCreateApi.as_view(), name='create_computation'),
+    path('computations/update/<str:income_tax_return_id>/', ComputationsUpdateApi.as_view(), name='update_computation'),
 ]
