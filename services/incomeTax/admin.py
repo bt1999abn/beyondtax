@@ -1,9 +1,9 @@
 from django.contrib import admin
-
 from services.incomeTax.models import IncomeTaxBankDetails, IncomeTaxAddress, IncomeTaxProfile, IncomeTaxReturnYears, \
     IncomeTaxReturn, ResidentialStatusQuestions, ResidentialStatusAnswer, BuyerDetails, LandDetails, SalaryIncome, \
     RentalIncome, CapitalGains, BusinessIncome, AgricultureIncome, ExemptIncome, DividendIncome, \
-    InterestIncome, InterestOnItRefunds, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, IncomeFromBetting, Deductions
+    InterestIncome, InterestOnItRefunds, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, IncomeFromBetting, \
+    Deductions, Computations
 
 
 class IncomeTaxBankDetailsInline(admin.TabularInline):
@@ -128,6 +128,12 @@ class SelfAssesmentAndAdvanceTaxPaidAdmin(admin.ModelAdmin):
     search_fields = ('bsr_code', 'challan_no')
 
 
+class ComputationsAdmin(admin.ModelAdmin):
+    list_display = ('income_tax_return', 'regime_type')
+    search_fields = ('income_tax_return__id', 'regime_type')
+    list_filter = ('regime_type',)
+
+
 admin.site.register(IncomeTaxProfile, IncomeTaxProfileAdmin)
 admin.site.register(IncomeTaxReturnYears, IncomeTaxReturnYearsAdmin)
 admin.site.register(ResidentialStatusQuestions, ResidentialStatusAdmin)
@@ -145,3 +151,4 @@ admin.site.register(IncomeFromBetting, IncomeFromBettingAdmin)
 admin.site.register(Deductions, DeductionsAdmin)
 admin.site.register(TdsOrTcsDeduction, TdsOrTcsDeductionAdmin)
 admin.site.register(SelfAssesmentAndAdvanceTaxPaid, SelfAssesmentAndAdvanceTaxPaidAdmin)
+admin.site.register(Computations, ComputationsAdmin)

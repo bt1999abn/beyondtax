@@ -49,6 +49,11 @@ class IncomeTaxProfile(abstract_models.BaseModel):
     is_data_imported = models.BooleanField(default=False, blank=True)
     REQUIRED_FIELDS = 'pan_no'
 
+    def save(self, *args, **kwargs):
+        if self.pan_no:
+            self.pan_no = self.pan_no.upper()
+        super().save(*args, **kwargs)
+
 
 class IncomeTaxBankDetails(abstract_models.BaseModel):
     SavingsAccount, CurrentAccount = 1, 2
@@ -307,6 +312,11 @@ class AgricultureIncome(abstract_models.BaseModel):
     net_income = models.DecimalField(max_digits=30, decimal_places=2)
     previous_unabsorbed_losses = models.DecimalField(max_digits=30, decimal_places=2)
 
+    def save(self, *args, **kwargs):
+        # Calculate net income as gross_recipts - expences - previous_unabsorbed_losses
+        self.net_income = self.gross_recipts - self.expences - self.previous_unabsorbed_losses
+        super(AgricultureIncome, self).save(*args, **kwargs)
+
 
 class LandDetails(abstract_models.BaseModel):
     Own, HeldOnLease = 1, 2
@@ -457,3 +467,13 @@ class SelfAssesmentAndAdvanceTaxPaid(abstract_models.BaseModel):
     challan_pdf = models.FileField(upload_to='tax_paid_challan_document_files/')
 
 
+class Computations(abstract_models.BaseModel):
+    New, Old = 1, 2
+    REGIME_TYPE_CHOICES = (
+        (New, 'new'),
+        (Old, 'old'),
+    )
+    income_tax_return = models.ForeignKey(IncomeTaxReturn, on_delete=models.CASCADE,
+                                          related_name='computations', null=True)
+    regime_json_data = models.JSONField()
+    regime_type = models.IntegerField(choices=REGIME_TYPE_CHOICES)

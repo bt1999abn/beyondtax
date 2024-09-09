@@ -1,8 +1,11 @@
+import datetime
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import unquote
 from django.db.models import Sum
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
@@ -11,7 +14,7 @@ from accounts.models import User
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeTaxReturnYears, \
     ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress, SalaryIncome, RentalIncome, BuyerDetails, \
     CapitalGains, BusinessIncome, AgricultureIncome, LandDetails, InterestIncome, InterestOnItRefunds, DividendIncome, \
-    IncomeFromBetting, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, Deductions, ExemptIncome
+    IncomeFromBetting, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, Deductions, ExemptIncome, Computations
 from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     IncomeTaxReturnSerializer, ResidentialStatusQuestionsSerializer, SalaryIncomeSerializer, RentalIncomeSerializer, \
     CapitalGainsSerializer, BusinessIncomeSerializer, AgricultureIncomeSerializer, InterestIncomeSerializer, \
@@ -19,11 +22,11 @@ from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
     LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer, \
     TdsPdfSerializer, ChallanPdfUploadSerializer, AISPdfUploadSerializer, IncomeTaxReturnYearSerializer, \
-    ReportsPageSerializer, ReportsPageGraphDataSerializer, TaxSummarySerializer
+    ReportsPageSerializer, ReportsPageGraphDataSerializer, TaxSummarySerializer, ComputationsSerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
-from services.incomeTax.utils import IncomeTaxCurrentYear
+from services.incomeTax.utils import IncomeTaxCurrentYear, IncomeTaxCalculations
 from shared.libs.hashing import AlphaId
 
 
@@ -1350,3 +1353,471 @@ class TaxRefundAPIView(generics.GenericAPIView):
         current_income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id, user=request.user)
         serializer = self.get_serializer(current_income_tax_return)
         return Response(serializer.data, status=200)
+
+
+class ComputationsOldRegimeApi(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    tax_calculator = IncomeTaxCalculations()
+
+    def get(self, request, *args, **kwargs):
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+
+        user = request.user
+
+        salary_incomes = SalaryIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        rental_incomes = RentalIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        capital_gains = CapitalGains.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        business_incomes = BusinessIncome.objects.filter(income_tax__user=user,
+                                                         income_tax_return_id=income_tax_return_id)
+        interest_incomes = InterestIncome.objects.filter(income_tax__user=user,
+                                                         income_tax_return_id=income_tax_return_id)
+        dividend_incomes = DividendIncome.objects.filter(income_tax__user=user,
+                                                         income_tax_return_id=income_tax_return_id)
+        income_from_bettings = IncomeFromBetting.objects.filter(income_tax__user=user,
+                                                                income_tax_return_id=income_tax_return_id)
+        exempt_incomes = ExemptIncome.objects.filter(income_tax_return_id=income_tax_return_id)
+        agriculture_incomes = AgricultureIncome.objects.filter(income_tax_return_id=income_tax_return_id)
+        deductions = Deductions.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id).first()
+        tds_deductions = TdsOrTcsDeduction.objects.filter(income_tax_return_id=income_tax_return_id,
+                                                          income_tax__user=user)
+        self_assessment_advance_tax = SelfAssesmentAndAdvanceTaxPaid.objects.filter(
+            income_tax_return_id=income_tax_return_id, income_tax__user=user)
+
+        tax_return = salary_incomes.first().income_tax_return if salary_incomes.exists() else None
+        tax_return_year = tax_return.income_tax_return_year if tax_return else None
+        filing_date = timezone.now().date()
+        due_date = tax_return_year.due_date if tax_return_year else None
+        start_date = tax_return_year.start_date if tax_return_year else None
+        end_date = tax_return_year.end_date if tax_return_year else None
+
+        base_standard_deduction = Decimal('50000')
+
+        salary_incomes_data_old, _, total_income_from_salaries_old, _ = self.tax_calculator.calculate_salary_income(
+            salary_incomes, base_standard_deduction)
+
+        rental_incomes_data, total_rental_income_old, _ = self.tax_calculator.calculate_rental_income(rental_incomes)
+
+        total_capital_gains_income, long_term_capital_gains_112A, long_term_capital_gains_others, short_term_capital_gains = self.tax_calculator.calculate_capital_gains(
+            capital_gains)
+
+        business_incomes_data, total_income_from_business = self.tax_calculator.calculate_business_income(
+            business_incomes)
+
+        total_interest_income = sum([i.interest_amount for i in interest_incomes])
+        total_dividend_income = sum([d.amount for d in dividend_incomes])
+        total_winnings_income = sum([w.amount for w in income_from_bettings])
+
+        total_exempt_income = sum([e.amount for e in exempt_incomes])
+        total_net_income_from_agriculture = sum([agri_income.net_income for agri_income in agriculture_incomes])
+        total_combined_exempt_income = total_exempt_income + total_net_income_from_agriculture
+
+        deduction_80c_sum, nps_contribution_sum, medical_premium_sum, interest_on_savings_sum = self.tax_calculator.calculate_deductions(
+            deductions, interest_incomes)
+
+        total_deduction_amount = deduction_80c_sum + nps_contribution_sum + medical_premium_sum + interest_on_savings_sum
+
+        total_tds_or_tcs, total_self_assessment_tax, total_advance_tax = self.tax_calculator.calculate_tds_advance_tax(
+            tds_deductions, self_assessment_advance_tax, start_date, end_date)
+
+        gross_total_income_old = self.tax_calculator.calculate_gross_total_income(
+            total_income_from_salaries_old, total_rental_income_old, total_income_from_business,
+            total_capital_gains_income,
+            total_interest_income, total_dividend_income, total_winnings_income, total_combined_exempt_income)
+
+        total_income_old = gross_total_income_old - total_deduction_amount
+
+        tax_liability_old = self.tax_calculator.calculate_tax_liability_old_regime(gross_total_income_old)
+
+        surcharge_old = self.tax_calculator.calculate_surcharge(gross_total_income_old, tax_liability_old, regime="old")
+
+        tax_rebate_old = self.tax_calculator.calculate_tax_rebate_old_regime(gross_total_income_old, tax_liability_old)
+
+        cess_old = self.tax_calculator.calculate_cess(tax_liability_old, surcharge_old, tax_rebate_old)
+
+        net_tax_payable_old = tax_liability_old + surcharge_old - tax_rebate_old + cess_old
+
+        balance_tax_to_be_paid_old = net_tax_payable_old - total_advance_tax - total_tds_or_tcs
+
+        interest_234A_old = self.tax_calculator.calculate_interest_234A(balance_tax_to_be_paid_old, filing_date,
+                                                                        due_date)
+        interest_234B_old = self.tax_calculator.calculate_interest_234B(balance_tax_to_be_paid_old, total_advance_tax,
+                                                                        net_tax_payable_old)
+        interest_234C_old = self.tax_calculator.calculate_interest_234C(balance_tax_to_be_paid_old, total_advance_tax,
+                                                                        net_tax_payable_old)
+        total_interest_234_old = interest_234A_old + interest_234B_old + interest_234C_old
+
+        penalty_us_234F_old = self.tax_calculator.calculate_penalty_us_234F(total_income_old, filing_date, due_date)
+
+        tax_payable_old = balance_tax_to_be_paid_old + total_interest_234_old + penalty_us_234F_old
+
+        old_regime_data = {
+            "salary_incomes": salary_incomes_data_old,
+            "total_income_from_salaries": self.tax_calculator.round_off_decimal(total_income_from_salaries_old),
+            "rental_incomes": rental_incomes_data,
+            "Long Term Capital Gain u/s 112A": self.tax_calculator.round_off_decimal(long_term_capital_gains_112A),
+            "Long Term Capital Gain - Others": self.tax_calculator.round_off_decimal(long_term_capital_gains_others),
+            "Short Term Capital Gain": self.tax_calculator.round_off_decimal(short_term_capital_gains),
+            "Total Capital Gains Income": self.tax_calculator.round_off_decimal(total_capital_gains_income),
+            "business_incomes": business_incomes_data,
+            "total_income_from_business": self.tax_calculator.round_off_decimal(total_income_from_business),
+            "Interest Income": self.tax_calculator.round_off_decimal(total_interest_income),
+            "Dividend Income": self.tax_calculator.round_off_decimal(total_dividend_income),
+            "Winnings: Lotteries, Games, Bettings": self.tax_calculator.round_off_decimal(total_winnings_income),
+            "Total of Other Incomes": self.tax_calculator.round_off_decimal(
+                total_interest_income + total_dividend_income + total_winnings_income),
+            "Exempt Income": self.tax_calculator.round_off_decimal(total_exempt_income),
+            "Net Income from Agriculture": self.tax_calculator.round_off_decimal(total_net_income_from_agriculture),
+            "Total Exempt Income": self.tax_calculator.round_off_decimal(total_combined_exempt_income),
+            "Deduction U/S 80C": self.tax_calculator.round_off_decimal(deduction_80c_sum),
+            "NPS Contribution u/s CCD": self.tax_calculator.round_off_decimal(nps_contribution_sum),
+            "80D: Medical Insurance Premium": self.tax_calculator.round_off_decimal(medical_premium_sum),
+            "80TTA: Interest on Savings A/c": self.tax_calculator.round_off_decimal(interest_on_savings_sum),
+            "Total Deduction Amount": self.tax_calculator.round_off_decimal(total_deduction_amount),
+            "TDS/TCS": self.tax_calculator.round_off_decimal(total_tds_or_tcs),
+            "Self Assessment Tax": self.tax_calculator.round_off_decimal(total_self_assessment_tax),
+            "Advance Tax": self.tax_calculator.round_off_decimal(total_advance_tax),
+            "gross_total_income": self.tax_calculator.round_off_decimal(gross_total_income_old),
+            "total_income": self.tax_calculator.round_off_decimal(total_income_old),
+            "Tax Liability at normal rates": self.tax_calculator.round_off_decimal(tax_liability_old),
+            "Tax Rebate": self.tax_calculator.round_off_decimal(tax_rebate_old),
+            "Surcharge": self.tax_calculator.round_off_decimal(surcharge_old),
+            "Cess": self.tax_calculator.round_off_decimal(cess_old),
+            "Net Tax Payable": self.tax_calculator.round_off_decimal(net_tax_payable_old),
+            "Balance Tax to be Paid": self.tax_calculator.round_off_decimal(balance_tax_to_be_paid_old),
+            "Interest U/S 234A, B, C": self.tax_calculator.round_off_decimal(total_interest_234_old),
+            "Penalty u/s 234F": self.tax_calculator.round_off_decimal(penalty_us_234F_old),
+            "Tax Payable": self.tax_calculator.round_off_decimal(tax_payable_old)
+        }
+
+        # Prepare the final response for old regime
+        old_regime_data_serializable = self.tax_calculator.convert_to_json_serializable(old_regime_data)
+
+        return Response({"old_regime": old_regime_data_serializable}, status=200)
+
+
+class ComputationsNewRegimeApi(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    tax_calculator = IncomeTaxCalculations()
+
+    def get(self, request, *args, **kwargs):
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+        user = request.user
+
+        salary_incomes = SalaryIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        rental_incomes = RentalIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        capital_gains = CapitalGains.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        business_incomes = BusinessIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        interest_incomes = InterestIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        dividend_incomes = DividendIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        income_from_bettings = IncomeFromBetting.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        exempt_incomes = ExemptIncome.objects.filter(income_tax_return_id=income_tax_return_id)
+        agriculture_incomes = AgricultureIncome.objects.filter(income_tax_return_id=income_tax_return_id)
+        deductions = Deductions.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id).first()
+        tds_deductions = TdsOrTcsDeduction.objects.filter(income_tax_return_id=income_tax_return_id, income_tax__user=user)
+        self_assessment_advance_tax = SelfAssesmentAndAdvanceTaxPaid.objects.filter(income_tax_return_id=income_tax_return_id, income_tax__user=user)
+
+        tax_return = salary_incomes.first().income_tax_return if salary_incomes.exists() else None
+        tax_return_year = tax_return.income_tax_return_year if tax_return else None
+        filing_date = timezone.now().date()
+        due_date = tax_return_year.due_date if tax_return_year else None
+
+        start_date = tax_return_year.start_date if tax_return_year else None
+        end_date = tax_return_year.end_date if tax_return_year else None
+
+        base_standard_deduction = Decimal('50000')
+
+        _, salary_incomes_data_new, _, total_income_from_salaries_new = self.tax_calculator.calculate_salary_income(
+            salary_incomes, base_standard_deduction)
+
+        rental_incomes_data, _, total_rental_income_new = self.tax_calculator.calculate_rental_income(rental_incomes)
+
+        total_capital_gains_income, long_term_capital_gains_112A, long_term_capital_gains_others, short_term_capital_gains = self.tax_calculator.calculate_capital_gains(
+            capital_gains)
+
+        business_incomes_data, total_income_from_business = self.tax_calculator.calculate_business_income(business_incomes)
+
+        total_interest_income = sum([i.interest_amount for i in interest_incomes])
+        total_dividend_income = sum([d.amount for d in dividend_incomes])
+        total_winnings_income = sum([w.amount for w in income_from_bettings])
+
+        total_exempt_income = sum([e.amount for e in exempt_incomes])
+        total_net_income_from_agriculture = sum([agri_income.net_income for agri_income in agriculture_incomes])
+        total_combined_exempt_income = total_exempt_income + total_net_income_from_agriculture
+
+        deduction_80c_sum, nps_contribution_sum, medical_premium_sum, interest_on_savings_sum = self.tax_calculator.calculate_deductions(
+            deductions, interest_incomes)
+
+        total_deduction_amount = deduction_80c_sum + nps_contribution_sum + medical_premium_sum + interest_on_savings_sum
+
+        total_tds_or_tcs, total_self_assessment_tax, total_advance_tax = self.tax_calculator.calculate_tds_advance_tax(
+            tds_deductions, self_assessment_advance_tax, start_date, end_date)
+
+        gross_total_income_new = self.tax_calculator.calculate_gross_total_income(
+            total_income_from_salaries_new, total_rental_income_new, total_income_from_business, total_capital_gains_income,
+            total_interest_income, total_dividend_income, total_winnings_income, total_combined_exempt_income)
+
+        total_income_new = gross_total_income_new - total_deduction_amount
+
+        tax_liability_new = self.tax_calculator.calculate_tax_liability_new_regime(gross_total_income_new)
+
+        surcharge_new = self.tax_calculator.calculate_surcharge(gross_total_income_new, tax_liability_new, regime="new")
+
+        tax_rebate_new = self.tax_calculator.calculate_tax_rebate_new_regime(gross_total_income_new, tax_liability_new)
+
+        cess_new = self.tax_calculator.calculate_cess(tax_liability_new, surcharge_new, tax_rebate_new)
+
+        net_tax_payable_new = tax_liability_new + surcharge_new - tax_rebate_new + cess_new
+
+        balance_tax_to_be_paid_new = net_tax_payable_new - total_advance_tax - total_tds_or_tcs
+
+        interest_234A_new = self.tax_calculator.calculate_interest_234A(balance_tax_to_be_paid_new, filing_date, due_date)
+        interest_234B_new = self.tax_calculator.calculate_interest_234B(balance_tax_to_be_paid_new, total_advance_tax, net_tax_payable_new)
+        interest_234C_new = self.tax_calculator.calculate_interest_234C(balance_tax_to_be_paid_new, total_advance_tax, net_tax_payable_new)
+        total_interest_234_new = interest_234A_new + interest_234B_new + interest_234C_new
+
+        penalty_us_234F_new = self.tax_calculator.calculate_penalty_us_234F(total_income_new, filing_date, due_date)
+
+        tax_payable_new = balance_tax_to_be_paid_new + total_interest_234_new + penalty_us_234F_new
+
+        new_regime_data = {
+            "salary_incomes": salary_incomes_data_new,
+            "total_income_from_salaries": self.tax_calculator.round_off_decimal(total_income_from_salaries_new),
+            "rental_incomes": rental_incomes_data,
+            "Long Term Capital Gain u/s 112A": self.tax_calculator.round_off_decimal(long_term_capital_gains_112A),
+            "Long Term Capital Gain - Others": self.tax_calculator.round_off_decimal(long_term_capital_gains_others),
+            "Short Term Capital Gain": self.tax_calculator.round_off_decimal(short_term_capital_gains),
+            "Total Capital Gains Income": self.tax_calculator.round_off_decimal(total_capital_gains_income),
+            "business_incomes": business_incomes_data,
+            "total_income_from_business": self.tax_calculator.round_off_decimal(total_income_from_business),
+            "Interest Income": self.tax_calculator.round_off_decimal(total_interest_income),
+            "Dividend Income": self.tax_calculator.round_off_decimal(total_dividend_income),
+            "Winnings: Lotteries, Games, Bettings": self.tax_calculator.round_off_decimal(total_winnings_income),
+            "Total of Other Incomes": self.tax_calculator.round_off_decimal(total_interest_income + total_dividend_income + total_winnings_income),
+            "Exempt Income": self.tax_calculator.round_off_decimal(total_exempt_income),
+            "Net Income from Agriculture": self.tax_calculator.round_off_decimal(total_net_income_from_agriculture),
+            "Total Exempt Income": self.tax_calculator.round_off_decimal(total_combined_exempt_income),
+            "Deduction U/S 80C": self.tax_calculator.round_off_decimal(deduction_80c_sum),
+            "NPS Contribution u/s CCD": self.tax_calculator.round_off_decimal(nps_contribution_sum),
+            "80D: Medical Insurance Premium": self.tax_calculator.round_off_decimal(medical_premium_sum),
+            "80TTA: Interest on Savings A/c": self.tax_calculator.round_off_decimal(interest_on_savings_sum),
+            "Total Deduction Amount": self.tax_calculator.round_off_decimal(total_deduction_amount),
+            "TDS/TCS": self.tax_calculator.round_off_decimal(total_tds_or_tcs),
+            "Self Assessment Tax": self.tax_calculator.round_off_decimal(total_self_assessment_tax),
+            "Advance Tax": self.tax_calculator.round_off_decimal(total_advance_tax),
+            "gross_total_income": self.tax_calculator.round_off_decimal(gross_total_income_new),
+            "total_income": self.tax_calculator.round_off_decimal(total_income_new),
+            "Tax Liability at normal rates": self.tax_calculator.round_off_decimal(tax_liability_new),
+            "Tax Rebate": self.tax_calculator.round_off_decimal(tax_rebate_new),
+            "Surcharge": self.tax_calculator.round_off_decimal(surcharge_new),
+            "Cess": self.tax_calculator.round_off_decimal(cess_new),
+            "Net Tax Payable": self.tax_calculator.round_off_decimal(net_tax_payable_new),
+            "Balance Tax to be Paid": self.tax_calculator.round_off_decimal(balance_tax_to_be_paid_new),
+            "Interest U/S 234A, B, C": self.tax_calculator.round_off_decimal(total_interest_234_new),
+            "Penalty u/s 234F": self.tax_calculator.round_off_decimal(penalty_us_234F_new),
+            "Tax Payable": self.tax_calculator.round_off_decimal(tax_payable_new)
+        }
+        new_regime_data_serializable = self.tax_calculator.convert_to_json_serializable(new_regime_data)
+
+        return Response({"new_regime": new_regime_data_serializable}, status=200)
+
+
+class SummaryPageApi(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+
+        user = request.user
+
+        salary_incomes = SalaryIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        rental_incomes = RentalIncome.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        capital_gains = CapitalGains.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id)
+        business_incomes = BusinessIncome.objects.filter(income_tax__user=user,
+                                                         income_tax_return_id=income_tax_return_id)
+        interest_incomes = InterestIncome.objects.filter(income_tax__user=user,
+                                                         income_tax_return_id=income_tax_return_id)
+        dividend_incomes = DividendIncome.objects.filter(income_tax__user=user,
+                                                         income_tax_return_id=income_tax_return_id)
+        income_from_bettings = IncomeFromBetting.objects.filter(income_tax__user=user,
+                                                                income_tax_return_id=income_tax_return_id)
+        exempt_incomes = ExemptIncome.objects.filter(income_tax_return_id=income_tax_return_id)
+        agriculture_incomes = AgricultureIncome.objects.filter(income_tax_return_id=income_tax_return_id)
+        deductions = Deductions.objects.filter(income_tax__user=user, income_tax_return_id=income_tax_return_id).first()
+        tds_deductions = TdsOrTcsDeduction.objects.filter(income_tax_return_id=income_tax_return_id,
+                                                          income_tax__user=user)
+        self_assessment_advance_tax = SelfAssesmentAndAdvanceTaxPaid.objects.filter(
+            income_tax_return_id=income_tax_return_id, income_tax__user=user)
+
+        tax_return = salary_incomes.first().income_tax_return if salary_incomes.exists() else None
+        tax_return_year = tax_return.income_tax_return_year if tax_return else None
+        filing_date = timezone.now().date()
+        due_date = tax_return_year.due_date if tax_return_year else None
+        start_date = tax_return_year.start_date if tax_return_year else None
+        end_date = tax_return_year.end_date if tax_return_year else None
+
+        calc = IncomeTaxCalculations()
+
+        base_standard_deduction = Decimal('50000')
+        salary_incomes_data_old, _, total_income_from_salaries_old, _ = calc.calculate_salary_income(salary_incomes,
+                                                                                                     base_standard_deduction)
+        rental_incomes_data, total_rental_income_old, _ = calc.calculate_rental_income(rental_incomes)
+        total_capital_gains_income, long_term_capital_gains_112A, long_term_capital_gains_others, short_term_capital_gains = calc.calculate_capital_gains(
+            capital_gains)
+        business_incomes_data, total_income_from_business = calc.calculate_business_income(business_incomes)
+        total_interest_income = sum([i.interest_amount for i in interest_incomes])
+        total_dividend_income = sum([d.amount for d in dividend_incomes])
+        total_winnings_income = sum([w.amount for w in income_from_bettings])
+        total_exempt_income = sum([e.amount for e in exempt_incomes])
+        total_net_income_from_agriculture = sum([agri_income.net_income for agri_income in agriculture_incomes])
+        total_combined_exempt_income = total_exempt_income + total_net_income_from_agriculture
+        deduction_80c_sum, nps_contribution_sum, medical_premium_sum, interest_on_savings_sum = calc.calculate_deductions(
+            deductions, interest_incomes)
+        total_deduction_amount = deduction_80c_sum + nps_contribution_sum + medical_premium_sum + interest_on_savings_sum
+        total_tds_or_tcs, total_self_assessment_tax, total_advance_tax = calc.calculate_tds_advance_tax(tds_deductions,
+                                                                                                        self_assessment_advance_tax,
+                                                                                                        start_date,
+                                                                                                        end_date)
+        gross_total_income_old = calc.calculate_gross_total_income(total_income_from_salaries_old,
+                                                                   total_rental_income_old, total_income_from_business,
+                                                                   total_capital_gains_income, total_interest_income,
+                                                                   total_dividend_income, total_winnings_income,
+                                                                   total_combined_exempt_income)
+        total_income_old = gross_total_income_old - total_deduction_amount
+        tax_liability_old = calc.calculate_tax_liability_old_regime(gross_total_income_old)
+        surcharge_old = calc.calculate_surcharge(gross_total_income_old, tax_liability_old, regime="old")
+        tax_rebate_old = calc.calculate_tax_rebate_old_regime(gross_total_income_old, tax_liability_old)
+        cess_old = calc.calculate_cess(tax_liability_old, surcharge_old, tax_rebate_old)
+        net_tax_payable_old = tax_liability_old + surcharge_old - tax_rebate_old + cess_old
+        balance_tax_to_be_paid_old = net_tax_payable_old - total_advance_tax - total_tds_or_tcs
+        interest_234A_old = calc.calculate_interest_234A(balance_tax_to_be_paid_old, filing_date, due_date)
+        interest_234B_old = calc.calculate_interest_234B(balance_tax_to_be_paid_old, total_advance_tax,
+                                                         net_tax_payable_old)
+        interest_234C_old = calc.calculate_interest_234C(balance_tax_to_be_paid_old, total_advance_tax,
+                                                         net_tax_payable_old)
+        total_interest_234_old = interest_234A_old + interest_234B_old + interest_234C_old
+        penalty_us_234F_old = calc.calculate_penalty_us_234F(total_income_old, filing_date, due_date)
+        tax_payable_old = balance_tax_to_be_paid_old + total_interest_234_old + penalty_us_234F_old
+
+        _, salary_incomes_data_new, _, total_income_from_salaries_new = calc.calculate_salary_income(salary_incomes,
+                                                                                                     base_standard_deduction)
+        gross_total_income_new = calc.calculate_gross_total_income(total_income_from_salaries_new,
+                                                                   total_rental_income_old, total_income_from_business,
+                                                                   total_capital_gains_income, total_interest_income,
+                                                                   total_dividend_income, total_winnings_income,
+                                                                   total_combined_exempt_income)
+        total_income_new = gross_total_income_new - total_deduction_amount
+        tax_liability_new = calc.calculate_tax_liability_new_regime(gross_total_income_new)
+        surcharge_new = calc.calculate_surcharge(gross_total_income_new, tax_liability_new, regime="new")
+        tax_rebate_new = calc.calculate_tax_rebate_new_regime(gross_total_income_new, tax_liability_new)
+        cess_new = calc.calculate_cess(tax_liability_new, surcharge_new, tax_rebate_new)
+        net_tax_payable_new = tax_liability_new + surcharge_new - tax_rebate_new + cess_new
+        balance_tax_to_be_paid_new = net_tax_payable_new - total_advance_tax - total_tds_or_tcs
+        interest_234A_new = calc.calculate_interest_234A(balance_tax_to_be_paid_new, filing_date, due_date)
+        interest_234B_new = calc.calculate_interest_234B(balance_tax_to_be_paid_new, total_advance_tax,
+                                                         net_tax_payable_new)
+        interest_234C_new = calc.calculate_interest_234C(balance_tax_to_be_paid_new, total_advance_tax,
+                                                         net_tax_payable_new)
+        total_interest_234_new = interest_234A_new + interest_234B_new + interest_234C_new
+        penalty_us_234F_new = calc.calculate_penalty_us_234F(total_income_new, filing_date, due_date)
+        tax_payable_new = balance_tax_to_be_paid_new + total_interest_234_new + penalty_us_234F_new
+
+        total_rental_income_sum = sum([rental_income.annual_rent for rental_income in rental_incomes])
+
+        interest_and_penalty_old = total_interest_234_old + penalty_us_234F_old
+        interest_and_penalty_new = total_interest_234_new + penalty_us_234F_new
+
+        response_data = {
+            "old_regime": {
+                "total_income_from_salaries": calc.round_off_decimal(total_income_from_salaries_old),
+                "total_rental_income": calc.round_off_decimal(total_rental_income_sum),
+                "Total Capital Gains Income": calc.round_off_decimal(total_capital_gains_income),
+                "total_income_from_business": calc.round_off_decimal(total_income_from_business),
+                "Total of Other Incomes": calc.round_off_decimal(
+                    total_interest_income + total_dividend_income + total_winnings_income),
+                "Total Exempt Income": calc.round_off_decimal(total_combined_exempt_income),
+                "Total Deduction Amount": calc.round_off_decimal(total_deduction_amount),
+                "TDS/TCS": calc.round_off_decimal(total_tds_or_tcs),
+                "Self Assessment Tax": calc.round_off_decimal(total_self_assessment_tax),
+                "Advance Tax": calc.round_off_decimal(total_advance_tax),
+                "gross_total_income": calc.round_off_decimal(gross_total_income_old),
+                "total_income": calc.round_off_decimal(total_income_old),
+                "Tax Liability at normal rates": calc.round_off_decimal(tax_liability_old),
+                "Net Tax Payable": calc.round_off_decimal(net_tax_payable_old),
+                "Balance Tax to be Paid": calc.round_off_decimal(balance_tax_to_be_paid_old),
+                "interest_and_penalty": calc.round_off_decimal(interest_and_penalty_old),
+                "Tax Payable": calc.round_off_decimal(tax_payable_old),
+
+            },
+            "new_regime": {
+                "total_rental_income": calc.round_off_decimal(total_rental_income_sum),
+                "Total Capital Gains Income": calc.round_off_decimal(total_capital_gains_income),
+                "total_income_from_business": calc.round_off_decimal(total_income_from_business),
+                "Total of Other Incomes": calc.round_off_decimal(
+                    total_interest_income + total_dividend_income + total_winnings_income),
+                "Total Exempt Income": calc.round_off_decimal(total_combined_exempt_income),
+                "Total Deduction Amount": calc.round_off_decimal(total_deduction_amount),
+                "TDS/TCS": calc.round_off_decimal(total_tds_or_tcs),
+                "Self Assessment Tax": calc.round_off_decimal(total_self_assessment_tax),
+                "Advance Tax": calc.round_off_decimal(total_advance_tax),
+                "gross_total_income": calc.round_off_decimal(gross_total_income_new),
+                "total_income": calc.round_off_decimal(total_income_new),
+                "Tax Liability at normal rates": calc.round_off_decimal(tax_liability_new),
+                "interest_and_penalty": calc.round_off_decimal(interest_and_penalty_new),
+                "Tax Payable": calc.round_off_decimal(tax_payable_new),
+
+            }
+        }
+
+        return Response(response_data, status=200)
+
+
+class ComputationsCreateApi(generics.CreateAPIView):
+    serializer_class = ComputationsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+
+        income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id)
+        data = request.data.copy()
+        regime_type_str = data.get('regime_type', '').lower()
+
+        if regime_type_str == 'new':
+            regime_type = Computations.New
+        elif regime_type_str == 'old':
+            regime_type = Computations.Old
+        else:
+            return Response({'error': 'Invalid regime type. Use "new" or "old".'}, status=status.HTTP_400_BAD_REQUEST)
+
+        computation = Computations.objects.filter(income_tax_return=income_tax_return, regime_type=regime_type).first()
+
+        if computation:
+            serializer = self.get_serializer(computation, data=data, partial=True)
+        else:
+            serializer = self.get_serializer(data=data)
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save(income_tax_return=income_tax_return)
+        return Response(serializer.data, status=status.HTTP_200_OK if computation else status.HTTP_201_CREATED)
+
+
+class ComputationsUpdateApi(generics.UpdateAPIView):
+    serializer_class = ComputationsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
+        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
+
+        computation = get_object_or_404(Computations, income_tax_return__id=income_tax_return_id)
+
+        serializer = self.get_serializer(computation, data=request.data, partial=True, context={'income_tax_return': computation.income_tax_return})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
