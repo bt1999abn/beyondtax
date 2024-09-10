@@ -1023,15 +1023,12 @@ class TaxSummarySerializer(BaseModelSerializer):
 
 
 class ComputationsSerializer(BaseModelSerializer):
-    regime_type = serializers.SerializerMethodField()
+    regime_type = serializers.IntegerField(write_only=True)
     income_tax_return_id = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Computations
         fields = ['income_tax_return_id', 'regime_type', 'regime_json_data']
-
-    def get_regime_type(self, obj):
-        return 'new' if obj.regime_type == Computations.New else 'old'
 
     def to_internal_value(self, data):
         regime_type_str = data.get('regime_type', '').lower()
@@ -1046,6 +1043,7 @@ class ComputationsSerializer(BaseModelSerializer):
     def validate(self, data):
         income_tax_return = self.context.get('income_tax_return')
         regime_type = data.get('regime_type')
+
         if Computations.objects.filter(
                 income_tax_return=income_tax_return,
                 regime_type=regime_type
@@ -1057,7 +1055,7 @@ class ComputationsSerializer(BaseModelSerializer):
         return data
 
     def create(self, validated_data):
-        income_tax_return = validated_data.pop('income_tax_return')
+        income_tax_return = validated_data.pop('income_tax_return', None)
         computation = Computations.objects.create(
             income_tax_return=income_tax_return,
             **validated_data

@@ -57,4 +57,5 @@ urlpatterns = [
     path('tax-summary/<str:income_tax_return_id>/', SummaryPageApi.as_view(), name='tax-summary'),
     path('computations/<str:income_tax_return_id>/', ComputationsCreateApi.as_view(), name='create_computation'),
     path('computations/update/<str:income_tax_return_id>/', ComputationsUpdateApi.as_view(), name='update_computation'),
+    # path('itr-summary-pdf/<str:income_tax_return_id>/', IncomeTaxPdfView.as_view(), name='itr-summary-pdf'),
 ]
