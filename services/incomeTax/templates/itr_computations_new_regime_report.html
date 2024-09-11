@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Income Tax Computations Report - New Regime</title>
+</head>
+<body>
+
+<h1>Income Tax Computations - New Regime</h1>
+
+<div>
+    <h2>Income from Salaries</h2>
+    {% for salary in new_regime_data.salary_incomes %}
+    <div>
+        <strong>Employer Name:</strong> {{ salary.employer_name }}
+    </div>
+    <div>
+        <strong>Gross Salary (Rs):</strong> {{ salary.gross_salary |floatformat:2 }}
+    </div>
+    <div>
+        <strong>Standard Deduction (Rs):</strong> {{ salary.standard_deduction |floatformat:2 }}
+    </div>
+    <div>
+        <strong>Total Income (Rs):</strong> {{ salary.total_income |floatformat:2 }}
+    </div>
+    <hr>
+    {% endfor %}
+    <div><strong>Total Income from Salaries:</strong> {{ new_regime_data.total_income_from_salaries }}</div>
+</div>
+
+<div>
+    <h2>Income from House Property</h2>
+    {% for rental in new_regime_data.rental_incomes %}
+    <div>
+        <strong>Occupancy Status:</strong> {{ rental.occupancy_status }}
+    </div>
+    <div>
+        <strong>Annual Rent (Rs):</strong> {{ rental.annual_rent |floatformat:2 }}
+    </div>
+    <div>
+        <strong>Interest on Borrowed Capital (Rs):</strong> {{ rental.Interest_on_Borrowed_Capital_u_s_24_b |floatformat:2 }}
+    </div>
+    <div>
+        <strong>Total Rental Income (Rs):</strong> {{ rental.total_rental_income |floatformat:2 }}
+    </div>
+    <hr>
+    {% endfor %}
+</div>
+
+<div>
+    <h2>Income from Business/Profession</h2>
+    {% for business in new_regime_data.business_incomes %}
+    <div>
+        <strong>Business Income Type:</strong> {{ business.business_income_type }}
+    </div>
+    <div>
+        <strong>Profit from Business (Rs):</strong> {{ business.Profit_from_Business |floatformat:2 }}
+    </div>
+    <hr>
+    {% endfor %}
+    <div><strong>Total Income from Business:</strong> {{ new_regime_data.total_income_from_business |floatformat:2 }}</div>
+</div>
+
+<div>
+    <h2>Capital Gains</h2>
+    <div><strong>Long Term Capital Gain u/s 112A (Rs):</strong> {{ new_regime_data.long_term_capital_gain_u_s_112a |floatformat:2 }}</div>
+    <div><strong>Short Term Capital Gain (Rs):</strong> {{ new_regime_data.short_term_capital_gain |floatformat:2 }}</div>
+    <div><strong>Total Capital Gains Income (Rs):</strong> {{ new_regime_data.total_capital_gains_income |floatformat:2 }}</div>
+</div>
+
+<div>
+    <h2>Other Sources of Income</h2>
+    <div><strong>Interest Income (Rs):</strong> {{ new_regime_data.interest_income |floatformat:2 }}</div>
+    <div><strong>Dividend Income (Rs):</strong> {{ new_regime_data.dividend_income |floatformat:2 }}</div>
+</div>
+
+<div>
+    <h2>Deductions</h2>
+    <div><strong>Deduction u/s 80C (Rs):</strong> {{ new_regime_data.deduction_u_s_80c |floatformat:2 }}</div>
+    <div><strong>Total Deduction Amount (Rs):</strong> {{ new_regime_data.total_deduction_amount |floatformat:2 }}</div>
+</div>
+
+<div>
+    <h2>Tax Liability</h2>
+    <div><strong>Tax Liability (Rs):</strong> {{ new_regime_data.tax_liability_at_normal_rates |floatformat:2 }}</div>
+    <div><strong>Tax Rebate (Rs):</strong> {{ new_regime_data.tax_rebate |floatformat:2 }}</div>
+    <div><strong>Surcharge (Rs):</strong> {{ new_regime_data.surcharge |floatformat:2 }}</div>
+    <div><strong>Cess (Rs):</strong> {{ new_regime_data.cess |floatformat:2 }}</div>
+    <div><strong>Total Tax Payable (Rs):</strong> {{ new_regime_data.tax_payable |floatformat:2 }}</div>
+</div>
+
+</body>
+</html>

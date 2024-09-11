@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Income Tax Computations Report - Old Regime</title>
+</head>
+<body>
+
+<h1>Income Tax Computations - Old Regime</h1>
+
+<div>
+    <h2>Income from Salaries</h2>
+    {% for salary in old_regime_data.salary_incomes %}
+    <div>
+        <strong>Employer Name:</strong> {{ salary.employer_name }}
+    </div>
+    <div>
+        <strong>Gross Salary (Rs):</strong> {{ salary.gross_salary |floatformat:2 }}
+    </div>
+    <div>
+        <strong>Standard Deduction (Rs):</strong> {{ salary.standard_deduction|floatformat:2 }}
+    </div>
+    <div>
+        <strong>Total Income (Rs):</strong> {{ salary.total_income |floatformat:2 }}
+    </div>
+    <hr>
+    {% endfor %}
+    <div><strong>Total Income from Salaries:</strong> {{ old_regime_data.total_income_from_salaries }}</div>
+</div>
+
+<div>
+    <h2>Income from House Property</h2>
+    {% for rental in old_regime_data.rental_incomes %}
+    <div>
+        <strong>Occupancy Status:</strong> {{ rental.occupancy_status }}
+    </div>
+    <div>
+        <strong>Annual Rent (Rs):</strong> {{ rental.annual_rent }}
+    </div>
+    <div>
+        <strong>Interest on Borrowed Capital (Rs):</strong> {{ rental.Interest_on_Borrowed_Capital_u_s_24_b }}
+    </div>
+    <div>
+        <strong>Property Tax Paid (Rs):</strong> {{ rental.property_tax_paid }}
+    </div>
+    <div>
+        <strong>Total Rental Income (Rs):</strong> {{ rental.total_rental_income }}
+    </div>
+    <hr>
+    {% endfor %}
+</div>
+
+<div>
+    <h2>Income from Business/Profession</h2>
+    {% for business in old_regime_data.business_incomes %}
+    <div>
+        <strong>Business Income Type:</strong> {{ business.business_income_type }}
+    </div>
+    <div>
+        <strong>Profit from Business (Rs):</strong> {{ business.Profit_from_Business }}
+    </div>
+    <hr>
+    {% endfor %}
+    <div><strong>Total Income from Business (Rs):</strong> {{ old_regime_data.total_income_from_business }}</div>
+</div>
+
+<div>
+    <h2>Deductions</h2>
+    <div>
+        <strong>Deduction u/s 80C (Rs):</strong> {{ old_regime_data.deduction_u_s_80c }}
+    </div>
+    <div>
+        <strong>NPS Contribution u/s CCD (Rs):</strong> {{ old_regime_data.nps_contribution_u_s_ccd }}
+    </div>
+    <div>
+        <strong>Medical Insurance Premium (Rs):</strong> {{ old_regime_data.80d_medical_insurance_premium }}
+    </div>
+    <div>
+        <strong>Interest on Savings Account u/s 80TTA (Rs):</strong> {{ old_regime_data.80tta_interest_on_savings_acc }}
+    </div>
+    <div><strong>Total Deduction Amount (Rs):</strong> {{ old_regime_data.total_deduction_amount }}</div>
+</div>
+
+<div>
+    <h2>Taxes Paid</h2>
+    <div>
+        <strong>TDS/TCS (Rs):</strong> {{ old_regime_data.tds_or_tcs }}
+    </div>
+    <div>
+        <strong>Self Assessment Tax (Rs):</strong> {{ old_regime_data.self_assessment_tax }}
+    </div>
+    <div>
+        <strong>Advance Tax (Rs):</strong> {{ old_regime_data.advance_tax }}
+    </div>
+
+</div>
+
+<div>
+    <h2>Tax Liability</h2>
+    <div>
+        <strong>Tax Liability at Normal Rates (Rs):</strong> {{ old_regime_data.tax_liability_at_normal_rates }}
+    </div>
+    <div>
+        <strong>Tax Rebate (Rs):</strong> {{ old_regime_data.tax_rebate }}
+    </div>
+    <div>
+        <strong>Surcharge (Rs):</strong> {{ old_regime_data.surcharge }}
+    </div>
+    <div>
+        <strong>Cess (Rs):</strong> {{ old_regime_data.cess }}
+    </div>
+    <div>
+        <strong>Interest u/s 234A/B/C (Rs):</strong> {{ old_regime_data.interest_u_s_234a_b_c }}
+    </div>
+    <div><strong>Tax Payable (Rs):</strong> {{ old_regime_data.tax_payable }}</div>
+</div>
+
+</body>
+</html>

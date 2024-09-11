@@ -7,7 +7,8 @@ from .views import IncomeTaxProfileApi, ListIncomeTaxReturnsView, ResidentialSta
     TaxPaidApi, TotalIncomeGetAPIView, TotalSummaryGetAPI, TdsPdfUploadApi, ChallanUploadApi, \
     AISPdfUploadApi, IncomeTaxReturnYearListAPIView, Download26ASAPIView, \
     DownloadAISAPIView, ReportsPageAPIView, DownloadTISAPIView, TaxRefundAPIView, ComputationsOldRegimeApi, \
-    ComputationsNewRegimeApi, SummaryPageApi, ComputationsCreateApi, ComputationsUpdateApi
+    ComputationsNewRegimeApi, SummaryPageApi, ComputationsCreateApi, ComputationsUpdateApi, IncomeTaxPdfView, \
+    IncometaxComputationsOldPdfView, IncometaxComputationsNewPdfView
 
 urlpatterns = [
     path('create-incometax-profile/', IncomeTaxProfileApi.as_view(), name='create-incometax-profile'),
@@ -57,5 +58,7 @@ urlpatterns = [
     path('tax-summary/<str:income_tax_return_id>/', SummaryPageApi.as_view(), name='tax-summary'),
     path('computations/<str:income_tax_return_id>/', ComputationsCreateApi.as_view(), name='create_computation'),
     path('computations/update/<str:income_tax_return_id>/', ComputationsUpdateApi.as_view(), name='update_computation'),
-    # path('itr-summary-pdf/<str:income_tax_return_id>/', IncomeTaxPdfView.as_view(), name='itr-summary-pdf'),
+    path('itr-summary-pdf/<str:income_tax_return_id>/', IncomeTaxPdfView.as_view(), name='itr-summary-pdf'),
+    path('itr-computations-old-pdf/<str:income_tax_return_id>/', IncometaxComputationsOldPdfView.as_view(), name='itr-computations-old-pdf'),
+    path('itr-computations-new-pdf/<str:income_tax_return_id>/', IncometaxComputationsNewPdfView.as_view(), name='itr-computations-new-pdf'),
 ]
