@@ -187,6 +187,128 @@ class User(abstract_models.BaseModel, AbstractUser):
         super(User, self).save(*args, **kwargs)
 
 
+class ProfileInformation(abstract_models.BaseModel):
+    MALE, FEMALE, OTHER = 1, 2, 3
+    GENDER_CHOICES = (
+        (MALE, "Male"),
+        (FEMALE, "Female"),
+        (OTHER, "Other")
+    )
+    Married, Unmarried, PreferNotToDisclose = 1, 2, 3
+    MARRIED_STATUS_CHOICES = (
+        (Married, 'married'),
+        (Unmarried, 'unmarried'),
+        (PreferNotToDisclose, 'prefer not to disclose'),
+
+    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile_information')
+    first_name = models.CharField(max_length=255)
+    last_name = models.CharField(max_length=255)
+    fathers_name = models.CharField(max_length=255)
+    date_of_birth = models.DateField(null=True)
+    gender = models.IntegerField(choices=GENDER_CHOICES,null=True, blank=True)
+    maritual_status = models.IntegerField(choices=MARRIED_STATUS_CHOICES,null=True, blank=True)
+
+
+class ProfileAddress(abstract_models.BaseModel):
+    COMMUNICATION, PERMANENT = 1, 2
+    ADDRESS_TYPE_CHOICES = (
+        (COMMUNICATION, 'Communication Address'),
+        (PERMANENT, 'Permanent Address'),
+    )
+    OWNED, RENTED = 1, 2
+    RENT_CHOICES = (
+        (OWNED, 'Owned'),
+        (RENTED, 'Rented'),
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_address')
+    address_type = models.IntegerField(choices=ADDRESS_TYPE_CHOICES, default=COMMUNICATION)
+    rent_status = models.IntegerField(choices=RENT_CHOICES, default=OWNED)
+    rental_agreement = models.FileField(upload_to='rental_agreements/', blank=True)
+    door_no = models.CharField(max_length=255, blank=True)
+    permise_name = models.CharField(max_length=255, blank=True)
+    street = models.CharField(max_length=255, blank=True)
+    area = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=255, blank=True)
+    state = models.CharField(max_length=255, blank=True)
+    pincode = models.CharField(max_length=255, null=True)
+    country = models.CharField(max_length=255, blank=True)
+
+
+class ProfileBankAccounts(abstract_models.BaseModel):
+    SavingsAccount, CurrentAccount = 1, 2
+    TYPE_CHOICES = (
+        (SavingsAccount, 'Savings Account'),
+        (CurrentAccount, 'Current Account'),
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_bank_accounts')
+    account_no = models.CharField(max_length=255, blank=True)
+    ifsc_code = models.CharField(max_length=255, blank=True)
+    bank_name = models.CharField(max_length=255, blank=True)
+    type = models.IntegerField(choices=TYPE_CHOICES, blank=True)
+    is_primary = models.BooleanField(default=False)
+
+
+class GovernmentID(abstract_models.BaseModel):
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='government_ids')
+    pan_no = models.CharField(max_length=10, blank=True, null=True, validators=[
+        RegexValidator(
+            regex=r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$',
+            message="PAN number must be in format 'ABCDE1234F'"
+        )
+    ])
+    pan_card = models.FileField(upload_to='government_id_proofs/pan/', blank=True, null=True)
+    is_pan_verified = models.BooleanField(default=False)
+
+    aadhar_no = models.CharField(max_length=12, blank=True, null=True, validators=[
+        RegexValidator(
+            regex=r'^[0-9]{12}$',
+            message="Aadhaar number must be 12 digits"
+        )
+    ])
+    aadhar_card = models.FileField(upload_to='government_id_proofs/aadhar/', blank=True, null=True)
+    is_aadhaar_verified = models.BooleanField(default=False)
+
+    driving_license_no = models.CharField(max_length=15, blank=True, null=True, validators=[
+        RegexValidator(
+            regex=r'^[A-Z]{2}[0-9]{13}$',
+            message="Driving License number must be in format 'AB1234567890123'"
+        )
+    ])
+    driving_license_card = models.FileField(upload_to='government_id_proofs/driving_license/', blank=True, null=True)
+    driving_license_validity = models.DateField(blank=True, null=True)
+    is_driving_license_verified = models.BooleanField(default=False)
+
+    voter_id_no = models.CharField(max_length=10, blank=True, null=True, validators=[
+        RegexValidator(
+            regex=r'^[A-Z]{3}[0-9]{7}$',
+            message="Voter ID number must be in format 'ABC1234567'"
+        )
+    ])
+    voter_id_card = models.FileField(upload_to='government_id_proofs/voter_id/', blank=True, null=True)
+    is_voter_id_verified = models.BooleanField(default=False)
+
+    ration_card_no = models.CharField(max_length=12, blank=True, null=True, validators=[
+        RegexValidator(
+            regex=r'^[A-Z0-9]{10,12}$',
+            message="Ration Card number must be between 10 and 12 characters"
+        )
+    ])
+    ration_card_file = models.FileField(upload_to='government_id_proofs/ration_card/', blank=True, null=True)
+    is_ration_card_verified = models.BooleanField(default=False)
+
+    passport_no = models.CharField(max_length=8, blank=True, null=True, validators=[
+        RegexValidator(
+            regex=r'^[A-Z][0-9]{7}$',
+            message="Passport number must be in format 'A1234567'"
+        )
+    ])
+    passport_file = models.FileField(upload_to='government_id_proofs/passport/', blank=True, null=True)
+    passport_validity = models.DateField(blank=True, null=True)
+    is_passport_verified = models.BooleanField(default=False)
+
+
 class OtpRecord(abstract_models.BaseModel):
     Email, Mobile = 1, 2
     SOURCE_CHOICES =(

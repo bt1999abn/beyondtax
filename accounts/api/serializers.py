@@ -1,3 +1,4 @@
+import datetime
 from datetime import date
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import check_password
@@ -6,7 +7,8 @@ from django.core.validators import RegexValidator
 from django_filters import rest_framework as filters
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord
+from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord, ProfileInformation, \
+    ProfileAddress, GovernmentID, ProfileBankAccounts
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturnYears, IncomeTaxReturn
 from shared.libs.hashing import AlphaId
 from shared.rest.serializers import BaseSerializer, BaseModelSerializer
@@ -348,3 +350,93 @@ class UpdateUserTypeSerializer(BaseModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'client_type']
+
+
+class UserSerializer(BaseModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'date_of_birth', 'gender', 'profile_picture','mobile_number', 'email']
+
+
+class ProfileInformationSerializer(BaseModelSerializer):
+    class Meta:
+        model = ProfileInformation
+        fields = ['id', 'fathers_name', 'maritual_status']
+
+
+class ProfileAddressSerializer(BaseModelSerializer):
+    address_type_display = serializers.SerializerMethodField()
+    rent_status_display = serializers.SerializerMethodField()
+    class Meta:
+        model = ProfileAddress
+        fields = [
+            'id', 'address_type_display', 'rent_status_display', 'door_no', 'permise_name', 'street',
+            'area', 'city', 'state', 'pincode', 'country'
+        ]
+
+    def get_address_type_display(self, obj):
+        return obj.get_address_type_display()
+
+    def get_rent_status_display(self, obj):
+        return obj.get_rent_status_display()
+
+    def validate_rent_status(self, value):
+        if value is None:
+            raise serializers.ValidationError("Rent status is required.")
+        return value
+
+    def create(self, validated_data):
+        if 'rent_status' not in validated_data:
+            validated_data['rent_status'] = ProfileAddress.OWNED
+        return super().create(validated_data)
+
+
+class ProfileInformationUpdateSerializer(BaseModelSerializer):
+    full_name = serializers.CharField(write_only=True)
+    date_of_birth = serializers.CharField(write_only=True)
+    date_of_birth_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProfileInformation
+        fields = ['full_name', 'fathers_name', 'date_of_birth', 'date_of_birth_display','gender', 'maritual_status']
+
+    def validate_date_of_birth(self, value):
+        try:
+            return datetime.datetime.strptime(value, "%d/%m/%Y").date()
+        except ValueError:
+            raise serializers.ValidationError("Date of birth must be in format 'dd/mm/yyyy'.")
+
+    def get_date_of_birth_display(self, instance):
+        return instance.date_of_birth.strftime('%d/%m/%Y') if instance.date_of_birth else None
+
+    def update(self, instance, validated_data):
+
+        full_name = validated_data.pop('full_name', None)
+        if full_name:
+            name_parts = full_name.split()
+            instance.first_name = name_parts[0]
+            instance.last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+
+        instance.fathers_name = validated_data.get('fathers_name', instance.fathers_name)
+        instance.date_of_birth = validated_data.get('date_of_birth', instance.date_of_birth)
+        instance.gender = validated_data.get('gender', instance.gender)
+        instance.maritual_status = validated_data.get('maritual_status', instance.maritual_status)
+
+        instance.save()
+        return instance
+
+
+class GovernmentIDFullSerializer(BaseModelSerializer):
+    class Meta:
+        model = GovernmentID
+        fields = '__all__'
+
+
+class ProfileBankDetailsSerializer(BaseModelSerializer):
+    class Meta:
+        model = ProfileBankAccounts
+        fields = ['id', 'account_no', 'ifsc_code', 'bank_name', 'type', 'is_primary']
+
+
+
+

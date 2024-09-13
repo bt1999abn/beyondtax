@@ -2,7 +2,9 @@ from django.urls import path
 from accounts.api import views as accounts_api_views
 from knox.views import LogoutView, LogoutAllView
 from .views import UpcomingDueDatesApi, BusinessContactPersonAPIView, \
-    SendEmailOtpApi, VerifyEmailOtpApi, SendEmailApi, ResetPasswordApi, UpcomingDueDatesByMonthApi, UpdateUserTypeView
+    SendEmailOtpApi, VerifyEmailOtpApi, SendEmailApi, ResetPasswordApi, UpcomingDueDatesByMonthApi, UpdateUserTypeView, \
+    ProfileDetailView, ProfileInformationUpdateView, ProfileAddressView, GovernmentIDView, ProfileBankDetailsListView, \
+    ProfileBankDetailsCreateView, ProfileBankDetailsUpdateView, ProfileBankDetailsDeleteView
 
 urlpatterns =[
 
@@ -26,4 +28,12 @@ urlpatterns =[
     path('reset-password/', ResetPasswordApi.as_view(), name='reset-password'),
     path('upcoming-due-dates-monthly/', UpcomingDueDatesByMonthApi.as_view(), name='upcoming-due-dates-by-month'),
     path('update-user-type/', UpdateUserTypeView.as_view(), name='update-user-type'),
+    path('profile-details/', ProfileDetailView.as_view(), name='profile-detail'),
+    path('profile-basic-details/', ProfileInformationUpdateView.as_view(), name='profile-basic-details'),
+    path('profile-addresses/', ProfileAddressView.as_view(), name='profile-addresses'),
+    path('profile-government-ids/', GovernmentIDView.as_view(), name='government-ids-full'),
+    path('profile-bank-accounts/', ProfileBankDetailsListView.as_view(), name='bank-accounts-list'),
+    path('profile-bank-account-create/', ProfileBankDetailsCreateView.as_view(), name='bank-accounts-create'),
+    path('profile-bank-account-update/<str:pk>/', ProfileBankDetailsUpdateView.as_view(), name='bank-accounts-update'),
+    path('profile-bank-account-destroy/<str:pk>/', ProfileBankDetailsDeleteView.as_view(), name='bank-accounts-destroy'),
 ]
