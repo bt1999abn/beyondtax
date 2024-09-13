@@ -16,9 +16,12 @@ from knox import views as knox_views
 from accounts.api.serializers import RegistrationSerializer, UserProfileSerializer, \
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
     BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter, \
-    PasswordResetSerializer, UpdateUserTypeSerializer
+    PasswordResetSerializer, UpdateUserTypeSerializer, ProfileInformationSerializer, UserSerializer, \
+    ProfileAddressSerializer, ProfileInformationUpdateSerializer, GovernmentIDFullSerializer, \
+    ProfileBankDetailsSerializer
 from accounts.api.serializers import LoginSerializer
-from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails
+from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails, ProfileInformation, \
+    ProfileAddress, GovernmentID, ProfileBankAccounts
 from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
 from beyondTax import settings
 from shared.libs.hashing import AlphaId
@@ -363,3 +366,179 @@ class UpdateUserTypeView(APIView):
                 'message': 'User type updated successfully'
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProfileDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        try:
+            profile_info = ProfileInformation.objects.get(user=user)
+        except ProfileInformation.DoesNotExist:
+            profile_info = None
+
+        profile_address = ProfileAddress.objects.filter(user=user)
+
+        user_serializer = UserSerializer(user)
+        profile_info_serializer = ProfileInformationSerializer(profile_info) if profile_info else None
+        profile_address_serializer = ProfileAddressSerializer(profile_address, many=True)
+
+        response_data = {
+            'user': user_serializer.data,
+            'profile_information': profile_info_serializer.data if profile_info_serializer else None,
+            'profile_address': profile_address_serializer.data
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class ProfileInformationUpdateView(generics.UpdateAPIView):
+    queryset = ProfileInformation.objects.all()
+    serializer_class = ProfileInformationUpdateSerializer
+
+    def get_object(self):
+        return ProfileInformation.objects.get(user=self.request.user)
+
+
+class ProfileAddressView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProfileAddressSerializer
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        addresses = request.data
+        created_addresses = []
+        errors = []
+        for address_data in addresses:
+            serializer = self.serializer_class(data=address_data)
+            if serializer.is_valid():
+                serializer.save(user=user)
+                created_addresses.append(serializer.data)
+            else:
+                errors.append(serializer.errors)
+        if errors:
+            return Response({
+                "created_addresses": created_addresses,
+                "errors": errors
+            }, status=status.HTTP_207_MULTI_STATUS)
+        return Response({
+            "created_addresses": created_addresses
+        }, status=status.HTTP_201_CREATED)
+
+    def patch(self, request, *args, **kwargs):
+        user = request.user
+        addresses = request.data
+        updated_addresses = []
+        errors = []
+
+        for address_data in addresses:
+            encoded_address_id = address_data.get('id')
+            if not encoded_address_id:
+                errors.append({"error": "Address ID is required for updating."})
+                continue
+
+            try:
+                address_id = AlphaId.decode(encoded_address_id)
+                address_instance = ProfileAddress.objects.get(id=address_id, user=user)
+
+                serializer = self.serializer_class(address_instance, data=address_data, partial=True)
+                if serializer.is_valid():
+                    updated_instance = serializer.save()
+                    updated_instance_data = serializer.data
+                    updated_instance_data['id'] = AlphaId.encode(updated_instance.id)
+                    updated_addresses.append(updated_instance_data)
+                else:
+                    errors.append({encoded_address_id: serializer.errors})
+            except ProfileAddress.DoesNotExist:
+                errors.append({encoded_address_id: "Address not found or does not belong to the user."})
+
+        if errors:
+            return Response({
+                "updated_addresses": updated_addresses,
+                "errors": errors
+            }, status=status.HTTP_207_MULTI_STATUS)
+
+        return Response({
+            "updated_addresses": updated_addresses
+        }, status=status.HTTP_200_OK)
+
+
+class GovernmentIDView(generics.RetrieveAPIView):
+    serializer_class = GovernmentIDFullSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        government_id = GovernmentID.objects.filter(user=user).first()
+
+        if not government_id:
+            return Response({
+                "message": "No government ID records found.",
+                "data": {}
+            }, status=status.HTTP_200_OK)
+
+        serializer = self.get_serializer(government_id)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ProfileBankDetailsListView(generics.ListAPIView):
+    serializer_class = ProfileBankDetailsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Return all bank details for the authenticated user
+        return ProfileBankAccounts.objects.filter(user=user)
+
+
+class ProfileBankDetailsCreateView(generics.CreateAPIView):
+    serializer_class = ProfileBankDetailsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ProfileBankDetailsUpdateView(generics.UpdateAPIView):
+    serializer_class = ProfileBankDetailsSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+
+    def get_queryset(self):
+        user = self.request.user
+        return ProfileBankAccounts.objects.filter(user=user)
+
+    def get_object(self):
+        encoded_id = self.kwargs.get('pk')
+        decoded_id = AlphaId.decode(encoded_id)
+        queryset = self.get_queryset()
+        return generics.get_object_or_404(queryset, pk=decoded_id)
+
+
+class ProfileBankDetailsDeleteView(generics.DestroyAPIView):
+    serializer_class = ProfileBankDetailsSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+
+    def get_queryset(self):
+        user = self.request.user
+        return ProfileBankAccounts.objects.filter(user=user)
+
+    def get_object(self):
+        encoded_id = self.kwargs.get('pk')
+        decoded_id = AlphaId.decode(encoded_id)
+        queryset = self.get_queryset()
+
+        return generics.get_object_or_404(queryset, pk=decoded_id)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {"message": "Bank account successfully deleted."},
+            status=status.HTTP_200_OK
+        )
+

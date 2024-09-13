@@ -2,7 +2,8 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
-from accounts.models import UpcomingDueDates, OtpRecord
+from accounts.models import UpcomingDueDates, OtpRecord, ProfileInformation, ProfileAddress, ProfileBankAccounts, \
+    GovernmentID
 from accounts.proxy_models import ProductProxy
 from payments.models import Payment
 
@@ -86,6 +87,34 @@ class UserAdmin(BaseUserAdmin):
     filter_horizontal = ("user_permissions",)
 
 
+class ProfileInformationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'first_name', 'last_name', 'fathers_name', 'date_of_birth', 'gender', 'maritual_status')
+    search_fields = ('user__mobile_number', 'first_name', 'last_name', 'fathers_name')
+    list_filter = ('gender', 'maritual_status')
+
+
+class ProfileAddressAdmin(admin.ModelAdmin):
+    list_display = ('user', 'address_type', 'rent_status', 'door_no', 'street', 'city', 'state', 'pincode', 'country')
+    search_fields = ('user__mobile_number', 'door_no', 'city', 'state', 'pincode')
+    list_filter = ('address_type', 'rent_status', 'state', 'country')
+
+
+class ProfileBankAccountsAdmin(admin.ModelAdmin):
+    list_display = ('user', 'account_no', 'bank_name', 'ifsc_code', 'type', 'is_primary')
+    search_fields = ('user__mobile_number', 'account_no', 'bank_name', 'ifsc_code')
+    list_filter = ('type', 'is_primary')
+
+
+class GovernmentIDAdmin(admin.ModelAdmin):
+    list_display = (
+        'user', 'pan_no', 'is_pan_verified', 'aadhar_no', 'is_aadhaar_verified', 'driving_license_no',
+        'is_driving_license_verified', 'voter_id_no', 'is_voter_id_verified', 'ration_card_no',
+        'is_ration_card_verified', 'passport_no', 'is_passport_verified'
+    )
+    search_fields = ('user__mobile_number', 'pan_no', 'aadhar_no', 'driving_license_no', 'voter_id_no', 'ration_card_no', 'passport_no')
+    list_filter = ('is_pan_verified', 'is_aadhaar_verified', 'is_driving_license_verified', 'is_voter_id_verified', 'is_ration_card_verified', 'is_passport_verified')
+
+
 class ProductProxyAdmin(admin.ModelAdmin):
 
     list_display = ('product_name', 'amount', 'discount', 'government_fee', 'due_date', 'due_duration')
@@ -109,6 +138,10 @@ admin.site.register(accounts_models.User, UserAdmin)
 admin.site.register(ProductProxy, ProductProxyAdmin)
 admin.site.register(UpcomingDueDates, UpcomingDueDateAdmin)
 admin.site.register(OtpRecord, OtpRecordAdmin)
+admin.site.register(ProfileInformation, ProfileInformationAdmin)
+admin.site.register(ProfileAddress, ProfileAddressAdmin)
+admin.site.register(ProfileBankAccounts, ProfileBankAccountsAdmin)
+admin.site.register(GovernmentID, GovernmentIDAdmin)
 # # ... and, since we're not using Django's built-in permissions,
 # # unregister the Group model from admin_panel.
 # admin_panel.site.unregister(Group)

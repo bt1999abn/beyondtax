@@ -1040,20 +1040,6 @@ class ComputationsSerializer(BaseModelSerializer):
             raise serializers.ValidationError({'regime_type': 'Invalid regime type. Use "new" or "old".'})
         return super().to_internal_value(data)
 
-    def validate(self, data):
-        income_tax_return = self.context.get('income_tax_return')
-        regime_type = data.get('regime_type')
-
-        if Computations.objects.filter(
-                income_tax_return=income_tax_return,
-                regime_type=regime_type
-        ).exists():
-            raise serializers.ValidationError({
-                'regime_type': f'This income tax return already has a {self.get_regime_type_display()} regime.'
-            })
-
-        return data
-
     def create(self, validated_data):
         income_tax_return = validated_data.pop('income_tax_return', None)
         computation = Computations.objects.create(
@@ -1062,8 +1048,3 @@ class ComputationsSerializer(BaseModelSerializer):
         )
         return computation
 
-    def update(self, instance, validated_data):
-        instance.regime_type = validated_data.get('regime_type', instance.regime_type)
-        instance.regime_json_data = validated_data.get('regime_json_data', instance.regime_json_data)
-        instance.save()
-        return instance

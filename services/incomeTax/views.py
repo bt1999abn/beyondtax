@@ -18,17 +18,17 @@ from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturn, IncomeT
     ResidentialStatusQuestions, IncomeTaxBankDetails, IncomeTaxAddress, SalaryIncome, RentalIncome, BuyerDetails, \
     CapitalGains, BusinessIncome, AgricultureIncome, LandDetails, InterestIncome, InterestOnItRefunds, DividendIncome, \
     IncomeFromBetting, TdsOrTcsDeduction, SelfAssesmentAndAdvanceTaxPaid, Deductions, ExemptIncome, Computations
-from services.incomeTax.serializers import IncomeTaxProfileSerializer, \
-    IncomeTaxReturnSerializer, ResidentialStatusQuestionsSerializer, SalaryIncomeSerializer, RentalIncomeSerializer, \
+from services.incomeTax.serializers import IncomeTaxReturnSerializer, ResidentialStatusQuestionsSerializer, \
+    SalaryIncomeSerializer, RentalIncomeSerializer, \
     CapitalGainsSerializer, BusinessIncomeSerializer, AgricultureIncomeSerializer, InterestIncomeSerializer, \
     InterestOnItRefundsSerializer, DividendIncomeSerializer, IncomeFromBettingSerializer, TdsOrTcsDeductionSerializer, \
     SelfAssesmentAndAdvanceTaxPaidSerializer, DeductionsSerializer, ExemptIncomeSerializer, BuyerDetailsSerializer, \
     LandDetailsSerializer, AgricultureAndExemptIncomeSerializer, OtherIncomesSerializer, TaxPaidSerializer, \
     TdsPdfSerializer, ChallanPdfUploadSerializer, AISPdfUploadSerializer, IncomeTaxReturnYearSerializer, \
-    ReportsPageSerializer, ReportsPageGraphDataSerializer, TaxSummarySerializer, ComputationsSerializer
+    ReportsPageSerializer, ReportsPageGraphDataSerializer, TaxSummarySerializer, ComputationsSerializer, \
+    IncomeTaxProfileSerializer
 from services.incomeTax.services import PanVerificationService
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-
 from services.incomeTax.utils import IncomeTaxCurrentYear, IncomeTaxCalculations
 from shared.libs.hashing import AlphaId
 
@@ -1426,6 +1426,7 @@ class ComputationsOldRegimeApi(generics.GenericAPIView):
 
         total_tds_or_tcs, total_self_assessment_tax, total_advance_tax = self.tax_calculator.calculate_tds_advance_tax(
             tds_deductions, self_assessment_advance_tax, start_date, end_date)
+        tax_paid_old = total_tds_or_tcs + total_self_assessment_tax + total_advance_tax
 
         gross_total_income_old = self.tax_calculator.calculate_gross_total_income(
             total_income_from_salaries_old, total_rental_income_old, total_income_from_business,
@@ -1484,6 +1485,7 @@ class ComputationsOldRegimeApi(generics.GenericAPIView):
             "tds_or_tcs": self.tax_calculator.round_off_decimal(total_tds_or_tcs),
             "self_assessment_tax": self.tax_calculator.round_off_decimal(total_self_assessment_tax),
             "advance_tax": self.tax_calculator.round_off_decimal(total_advance_tax),
+            "tax_paid": tax_paid_old,
             "gross_total_income": self.tax_calculator.round_off_decimal(gross_total_income_old),
             "total_income": self.tax_calculator.round_off_decimal(total_income_old),
             "tax_liability_at_normal_rates": self.tax_calculator.round_off_decimal(tax_liability_old),
@@ -1562,6 +1564,7 @@ class ComputationsNewRegimeApi(generics.GenericAPIView):
 
         total_tds_or_tcs, total_self_assessment_tax, total_advance_tax = self.tax_calculator.calculate_tds_advance_tax(
             tds_deductions, self_assessment_advance_tax, start_date, end_date)
+        tax_paid_new = total_tds_or_tcs + total_self_assessment_tax + total_advance_tax
 
         gross_total_income_new = self.tax_calculator.calculate_gross_total_income(
             total_income_from_salaries_new, total_rental_income_new, total_income_from_business, total_capital_gains_income,
@@ -1615,6 +1618,7 @@ class ComputationsNewRegimeApi(generics.GenericAPIView):
             "tds_or_tcs": self.tax_calculator.round_off_decimal(total_tds_or_tcs),
             "self_assessment_tax": self.tax_calculator.round_off_decimal(total_self_assessment_tax),
             "advance_tax": self.tax_calculator.round_off_decimal(total_advance_tax),
+            "tax_paid": tax_paid_new,
             "gross_total_income": self.tax_calculator.round_off_decimal(gross_total_income_new),
             "total_income": self.tax_calculator.round_off_decimal(total_income_new),
             "tax_liability_at_normal_rates": self.tax_calculator.round_off_decimal(tax_liability_new),
@@ -1765,6 +1769,7 @@ class SummaryPageApi(generics.GenericAPIView):
 
             },
             "new_regime": {
+                "total_income_from_salaries": calc.round_off_decimal(total_income_from_salaries_new),
                 "total_rental_income": calc.round_off_decimal(total_rental_income_sum),
                 "total_capital_gains_income": calc.round_off_decimal(total_capital_gains_income),
                 "total_income_from_business": calc.round_off_decimal(total_income_from_business),
@@ -1796,7 +1801,6 @@ class ComputationsCreateApi(generics.CreateAPIView):
     def post(self, request, *args, **kwargs):
         encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
         income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
-
         income_tax_return = get_object_or_404(IncomeTaxReturn, id=income_tax_return_id)
         data = request.data.copy()
         regime_type_str = data.get('regime_type', '').lower()
@@ -1810,7 +1814,6 @@ class ComputationsCreateApi(generics.CreateAPIView):
 
         computation = Computations.objects.filter(income_tax_return=income_tax_return, regime_type=regime_type).first()
 
-        # Update if computation exists, else create new one
         if computation:
             serializer = self.get_serializer(computation, data=data, partial=True)
             status_code = status.HTTP_200_OK
@@ -1818,28 +1821,10 @@ class ComputationsCreateApi(generics.CreateAPIView):
             serializer = self.get_serializer(data=data)
             status_code = status.HTTP_201_CREATED
 
-        # Validate and save the serializer
         serializer.is_valid(raise_exception=True)
         serializer.save(income_tax_return=income_tax_return)
 
         return Response(serializer.data, status=status_code)
-
-
-class ComputationsUpdateApi(generics.UpdateAPIView):
-    serializer_class = ComputationsSerializer
-    permission_classes = [IsAuthenticated]
-
-    def patch(self, request, *args, **kwargs):
-        encoded_income_tax_return_id = self.kwargs['income_tax_return_id']
-        income_tax_return_id = AlphaId.decode(encoded_income_tax_return_id)
-
-        computation = get_object_or_404(Computations, income_tax_return__id=income_tax_return_id)
-
-        serializer = self.get_serializer(computation, data=request.data, partial=True, context={'income_tax_return': computation.income_tax_return})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class GeneratePdfMixin:
