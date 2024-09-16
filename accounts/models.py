@@ -1,9 +1,11 @@
 import datetime
+from datetime import timedelta
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 from accounts import constants as accounts_constants
 from shared import abstract_models
 from django.utils.translation import gettext_lazy as _
@@ -323,6 +325,10 @@ class OtpRecord(abstract_models.BaseModel):
 
     def __str__(self):
         return self.mobile_number
+
+    def is_expired(self):
+        expiration_time = self.created_at + timedelta(minutes=10)
+        return timezone.now() > expiration_time
 
 
 class ServicePages(abstract_models.BaseModel):

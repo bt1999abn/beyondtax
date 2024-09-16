@@ -5,11 +5,13 @@ from django.contrib.auth.hashers import make_password
 from django.core.files.images import get_image_dimensions
 from django.shortcuts import redirect
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, serializers, generics
+from rest_framework import status, serializers, generics, viewsets
 from django.utils import timezone
 from datetime import timedelta, date, datetime
 from knox import views as knox_views
@@ -17,8 +19,8 @@ from accounts.api.serializers import RegistrationSerializer, UserProfileSerializ
     ChangePasswordSerializer, UserBasicDetailsSerializer, UpcomingDueDateSerializer, AuthSerializer, \
     BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter, \
     PasswordResetSerializer, UpdateUserTypeSerializer, ProfileInformationSerializer, UserSerializer, \
-    ProfileAddressSerializer, ProfileInformationUpdateSerializer, GovernmentIDFullSerializer, \
-    ProfileBankDetailsSerializer
+    ProfileAddressSerializer, ProfileInformationUpdateSerializer, \
+    ProfileBankDetailsSerializer, GovernmentIDSerializer, EmailUpdateOtpSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails, ProfileInformation, \
     ProfileAddress, GovernmentID, ProfileBankAccounts
@@ -168,7 +170,7 @@ class ChangePasswordAPI(APIView):
         if serializer.is_valid():
             user = request.user
             serializer.update(user, serializer.validated_data)
-            return Response({"messages":"password updated succesfully"}, status= status.HTTP_204_NO_CONTENT)
+            return Response({"messages":"password updated succesfully"}, status= status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -401,49 +403,96 @@ class ProfileInformationUpdateView(generics.UpdateAPIView):
     def get_object(self):
         return ProfileInformation.objects.get(user=self.request.user)
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
 
 class ProfileAddressView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProfileAddressSerializer
+    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        addresses = request.data
         created_addresses = []
         errors = []
-        for address_data in addresses:
+
+        address_keys = [key for key in request.data.keys() if key.startswith('addresses[')]
+        num_addresses = max(
+            [int(key.split('[')[1].split(']')[0]) for key in address_keys]) + 1
+
+        for i in range(num_addresses):
+            address_data = {
+                'address_type': request.data.get(f"addresses[{i}].address_type"),
+                'door_no': request.data.get(f"addresses[{i}].door_no"),
+                'permise_name': request.data.get(f"addresses[{i}].permise_name"),
+                'street': request.data.get(f"addresses[{i}].street"),
+                'city': request.data.get(f"addresses[{i}].city"),
+                'state': request.data.get(f"addresses[{i}].state"),
+                'pincode': request.data.get(f"addresses[{i}].pincode"),
+                'country': request.data.get(f"addresses[{i}].country"),
+                'rent_status': request.data.get(f"addresses[{i}].rent_status"),
+                'rental_agreement': request.FILES.get(f"addresses[{i}].rental_agreement")
+            }
+            if not any(value for key, value in address_data.items() if key != 'rental_agreement'):
+                errors.append({
+                    f"addresses[{i}]": "Some required fields are missing or have invalid data."
+                })
+                continue
             serializer = self.serializer_class(data=address_data)
+
             if serializer.is_valid():
                 serializer.save(user=user)
                 created_addresses.append(serializer.data)
             else:
                 errors.append(serializer.errors)
+
         if errors:
             return Response({
                 "created_addresses": created_addresses,
                 "errors": errors
             }, status=status.HTTP_207_MULTI_STATUS)
+
         return Response({
             "created_addresses": created_addresses
         }, status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
         user = request.user
-        addresses = request.data
         updated_addresses = []
         errors = []
+        address_keys = [key for key in request.data.keys() if key.startswith('addresses[')]
+        num_addresses = max(
+            [int(key.split('[')[1].split(']')[0]) for key in address_keys]) + 1
 
-        for address_data in addresses:
-            encoded_address_id = address_data.get('id')
+        for i in range(num_addresses):
+            encoded_address_id = request.data.get(f"addresses[{i}].id")
+
             if not encoded_address_id:
-                errors.append({"error": "Address ID is required for updating."})
+                errors.append({"error": f"Address ID is required for updating address index {i}."})
                 continue
-
             try:
                 address_id = AlphaId.decode(encoded_address_id)
                 address_instance = ProfileAddress.objects.get(id=address_id, user=user)
-
+                address_data = {
+                    'address_type': request.data.get(f"addresses[{i}].address_type"),
+                    'door_no': request.data.get(f"addresses[{i}].door_no"),
+                    'permise_name': request.data.get(f"addresses[{i}].permise_name"),
+                    'street': request.data.get(f"addresses[{i}].street"),
+                    'city': request.data.get(f"addresses[{i}].city"),
+                    'state': request.data.get(f"addresses[{i}].state"),
+                    'pincode': request.data.get(f"addresses[{i}].pincode"),
+                    'country': request.data.get(f"addresses[{i}].country"),
+                    'rent_status': request.data.get(f"addresses[{i}].rent_status"),
+                    'rental_agreement': request.FILES.get(f"addresses[{i}].rental_agreement")
+                }
                 serializer = self.serializer_class(address_instance, data=address_data, partial=True)
+
                 if serializer.is_valid():
                     updated_instance = serializer.save()
                     updated_instance_data = serializer.data
@@ -452,8 +501,7 @@ class ProfileAddressView(generics.GenericAPIView):
                 else:
                     errors.append({encoded_address_id: serializer.errors})
             except ProfileAddress.DoesNotExist:
-                errors.append({encoded_address_id: "Address not found or does not belong to the user."})
-
+                errors.append({encoded_address_id: f"Address not found or does not belong to the user (index {i})."})
         if errors:
             return Response({
                 "updated_addresses": updated_addresses,
@@ -465,80 +513,196 @@ class ProfileAddressView(generics.GenericAPIView):
         }, status=status.HTTP_200_OK)
 
 
-class GovernmentIDView(generics.RetrieveAPIView):
-    serializer_class = GovernmentIDFullSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, *args, **kwargs):
-        user = request.user
-
-        government_id = GovernmentID.objects.filter(user=user).first()
-
-        if not government_id:
-            return Response({
-                "message": "No government ID records found.",
-                "data": {}
-            }, status=status.HTTP_200_OK)
-
-        serializer = self.get_serializer(government_id)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class ProfileBankDetailsListView(generics.ListAPIView):
+class ProfileBankDetailsViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileBankDetailsSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
 
     def get_queryset(self):
         user = self.request.user
-        # Return all bank details for the authenticated user
         return ProfileBankAccounts.objects.filter(user=user)
 
-
-class ProfileBankDetailsCreateView(generics.CreateAPIView):
-    serializer_class = ProfileBankDetailsSerializer
-    permission_classes = [IsAuthenticated]
+    def get_object(self):
+        encoded_id = self.kwargs.get('pk')
+        decoded_id = AlphaId.decode(encoded_id)
+        queryset = self.get_queryset()
+        return generics.get_object_or_404(queryset, pk=decoded_id)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-
-class ProfileBankDetailsUpdateView(generics.UpdateAPIView):
-    serializer_class = ProfileBankDetailsSerializer
-    permission_classes = [IsAuthenticated]
-    lookup_field = 'pk'
-
-    def get_queryset(self):
-        user = self.request.user
-        return ProfileBankAccounts.objects.filter(user=user)
-
-    def get_object(self):
-        encoded_id = self.kwargs.get('pk')
-        decoded_id = AlphaId.decode(encoded_id)
-        queryset = self.get_queryset()
-        return generics.get_object_or_404(queryset, pk=decoded_id)
-
-
-class ProfileBankDetailsDeleteView(generics.DestroyAPIView):
-    serializer_class = ProfileBankDetailsSerializer
-    permission_classes = [IsAuthenticated]
-    lookup_field = 'pk'
-
-    def get_queryset(self):
-        user = self.request.user
-        return ProfileBankAccounts.objects.filter(user=user)
-
-    def get_object(self):
-        encoded_id = self.kwargs.get('pk')
-        decoded_id = AlphaId.decode(encoded_id)
-        queryset = self.get_queryset()
-
-        return generics.get_object_or_404(queryset, pk=decoded_id)
-
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.perform_destroy(instance)
+
         return Response(
             {"message": "Bank account successfully deleted."},
             status=status.HTTP_200_OK
         )
 
+    @action(detail=False, methods=['put'], url_path='batch-update')
+    def batch_update(self, request, *args, **kwargs):
+
+        user = self.request.user
+        data_list = request.data
+
+        if not isinstance(data_list, list):
+            raise ValidationError("Input data must be a list of bank accounts.")
+
+        updated_instances = []
+        for data in data_list:
+            encoded_id = data.get('id')
+            if not encoded_id:
+                raise ValidationError("Each bank account must include an encoded 'id'.")
+
+            decoded_id = AlphaId.decode(encoded_id)
+            instance = ProfileBankAccounts.objects.filter(user=user, pk=decoded_id).first()
+            if instance is None:
+                raise ValidationError(f"Bank account with ID {encoded_id} not found for the user.")
+
+            serializer = self.get_serializer(instance, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+
+            if data.get('is_primary', False):
+                ProfileBankAccounts.objects.filter(user=user, is_primary=True).update(is_primary=False)
+
+            updated_instance = serializer.save()
+            updated_instances.append(updated_instance)
+
+        response_serializer = self.get_serializer(updated_instances, many=True)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class GovernmentIDViewSet(viewsets.ModelViewSet):
+    queryset = GovernmentID.objects.all()
+    serializer_class = GovernmentIDSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return GovernmentID.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        government_id_instance, created = GovernmentID.objects.update_or_create(
+            user=user,
+            defaults=serializer.validated_data
+        )
+        serializer.instance = government_id_instance
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class SendEmailChangeOtpApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        new_email = request.data.get('email')
+
+        if not new_email:
+            return Response({'status': 'error', 'message': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(email=new_email).exists():
+            return Response({'status': 'error', 'message': 'This email is already in use by another user'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+
+        otp_service = SendEmailOtpService()
+        otp_id = otp_service.send_otp_to_new_email(new_email)
+        request.session['email_otp_id'] = otp_id
+        request.session['new_email'] = new_email
+
+        return Response({'status': 'success', 'message': 'OTP sent to the new email', 'otp_id': otp_id},
+                        status=status.HTTP_200_OK)
+
+
+class VerifyEmailChangeOtpApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = EmailUpdateOtpSerializer(data=request.data)
+        if serializer.is_valid():
+            otp_id = serializer.validated_data['otp_id']
+            otp = serializer.validated_data['otp']
+
+            try:
+                otp_record = OtpRecord.objects.get(id=otp_id, otp=otp)
+
+                if otp_record.is_expired():
+                    return Response({'status': 'error', 'message': 'OTP has expired'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                user = request.user
+
+                new_email = request.session.get('new_email')
+
+                if not new_email:
+                    return Response({'status': 'error', 'message': 'No new email found'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                user.email = new_email
+                user.save()
+                del request.session['email_otp_id']
+                del request.session['new_email']
+                otp_record.delete()
+
+                return Response({'status': 'success', 'message': 'Email updated successfully'},
+                                status=status.HTTP_200_OK)
+
+            except OtpRecord.DoesNotExist:
+                return Response({'status': 'error', 'message': 'Invalid OTP or OTP ID'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SendMobileChangeOtpApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        new_mobile_number = request.data.get('mobile_number')
+
+        if not new_mobile_number:
+            return Response({'status': 'error', 'message': 'Mobile number is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(mobile_number=new_mobile_number).exists():
+            return Response({'status': 'error', 'message': 'This mobile number is already in use by another user'}, status=status.HTTP_400_BAD_REQUEST)
+        otp_service = SendMobileOtpService()
+        success, otp_id = otp_service.send_otp(new_mobile_number)
+
+        if success:
+            encoded_otp_id = AlphaId.encode(otp_id)
+
+            return Response({'status': 'success', 'otp_id': encoded_otp_id, 'message': 'OTP sent to the new mobile number'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'message': 'Failed to send OTP'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VerifyMobileChangeOtpApi(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        encoded_otp_id = request.data.get('otp_id')
+        otp = request.data.get('otp')
+
+        if not encoded_otp_id or not otp:
+            return Response({'status': 'error', 'message': 'OTP ID and OTP are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            otp_id = AlphaId.decode(encoded_otp_id)
+            otp_record = OtpRecord.objects.get(id=otp_id, otp=otp, source=OtpRecord.Mobile)
+            otp_service = SendMobileOtpService()
+            success, message = otp_service.verify_otp(otp_record.mobile_number, otp)
+
+            if success:
+                user = request.user
+                user.mobile_number = otp_record.mobile_number
+                user.save()
+
+                otp_record.delete()
+
+                return Response({'status': 'success', 'message': 'Mobile number updated successfully'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'status': 'error', 'message': message}, status=status.HTTP_400_BAD_REQUEST)
+
+        except OtpRecord.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Invalid OTP ID or OTP'}, status=status.HTTP_400_BAD_REQUEST)
