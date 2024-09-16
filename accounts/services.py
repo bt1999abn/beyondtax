@@ -18,43 +18,39 @@ from .models import OtpRecord, User
 
 
 class SendMobileOtpService:
-    def __init__(self):
-        self.OTP_TEMPLATE_NAME = "BEYONDTAX"
-        self.TWO_FACTOR_SEND_OTP_URL = "https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}/{otp_template}"
-        self.TWO_FACTOR_VERIFY_OTP_URL = "https://api.2factor.in/API/V1/{api_key}/SMS/VERIFY/{session_id}/{otp}"
-        self.TWOFACTOR_API_KEY = 'e64cf901-f976-11ee-8cbb-0200cd936042'
+    OTP_TEMPLATE_NAME = "BEYONDTAX"
+    TWO_FACTOR_SEND_OTP_URL = "https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}/{otp_template}"
+    TWOFACTOR_API_KEY = 'e64cf901-f976-11ee-8cbb-0200cd936042'
+
+    def generate_otp(self):
+        return str(format(random.randint(1000, 9999), '04d'))
 
     def send_otp(self, phone_number):
-        print(phone_number)
-        otp = str(format(random.randint(1000, 9999), '04d'))
+        otp = self.generate_otp()
         url = self.TWO_FACTOR_SEND_OTP_URL.format(
             api_key=self.TWOFACTOR_API_KEY, phone_number=phone_number, otp=otp, otp_template=self.OTP_TEMPLATE_NAME
         )
         response = requests.post(url)
         if response.status_code == 200:
-            data = response.json()
-            otp_session_id = data.get('Details')
-            # noinspection PyUnresolvedReferences
-            OtpRecord.objects.create(
-                mobile_number=phone_number, otp_session_id=otp_session_id,
-                otp=otp
+            # Create OtpRecord in the database
+            otp_record = OtpRecord.objects.create(
+                mobile_number=phone_number,
+                otp=otp,
+                source=OtpRecord.Mobile
             )
-            return True, otp_session_id
+            return True, otp_record.id
         else:
             return False, "Failed to send OTP"
 
-    def verify_otp(self, otp):
-        # noinspection PyUnresolvedReferences
-        otp_record = OtpRecord.objects.get(mobile_number=self.mobile_number)
-        url = self.TWO_FACTOR_VERIFY_OTP_URL.format(
-            api_key=self.TWOFACTOR_API_KEY, session_id=otp_record.otp_session_id, otp=otp
-        )
-        response = requests.get(url)
-
-        if response.status_code == 200 and response.json().get('Status') == "Success":
-            return True, "OTP verified successfully"
-        else:
-            return False, "Invalid OTP or OTP expired"
+    def verify_otp(self, phone_number, otp):
+        try:
+            otp_record = OtpRecord.objects.get(mobile_number=phone_number, otp=otp, source=OtpRecord.Mobile)
+            if timezone.now() < otp_record.created_at + timedelta(minutes=10):
+                return True, "OTP verified successfully"
+            else:
+                return False, "OTP has expired"
+        except OtpRecord.DoesNotExist:
+            return False, "Invalid OTP or mobile number"
 
 
 GOOGLE_ACCESS_TOKEN_OBTAIN_URL = 'https://oauth2.googleapis.com/token'
@@ -127,16 +123,28 @@ class SendEmailOtpService:
     def generate_otp(self):
         return random.randint(1000, 9999)
 
-    def send_otp_email(self, user, otp):
-        subject = 'Your OTP for Password Reset'
+    def send_otp_email(self, user, otp, template='otp_email'):
+        subject = 'Your OTP for Verification'
         first_name = user.first_name
-        html_message = render_to_string('email_templates/otp_email.html', {'user': first_name, 'otp': otp})
+        html_message = render_to_string(f'email_templates/{template}.html', {'user': first_name, 'otp': otp})
         plain_message = strip_tags(html_message)
         email_from = settings.EMAIL_HOST_USER
         recipient_list = [user.email]
         send_mail(subject, plain_message, email_from, recipient_list, html_message=html_message)
 
-    def send_otp(self, user):
+    def send_otp_to_new_email(self, new_email, template='email_id_update'):
+        otp = self.generate_otp()
+        otp_record = OtpRecord.objects.create(
+            email=new_email,
+            otp=str(otp),
+            source=OtpRecord.Email
+        )
+        email_thread = threading.Thread(target=self.send_otp_email, args=(new_email, otp, template, None))
+        email_thread.start()
+
+        return otp_record.id
+
+    def send_otp(self, user, template='otp_email'):
         otp = self.generate_otp()
         otp_record = OtpRecord.objects.create(
             email=user.email,
@@ -144,7 +152,7 @@ class SendEmailOtpService:
             otp=str(otp),
             source=OtpRecord.Email,
         )
-        email_thread = threading.Thread(target=self.send_otp_email, args=(user, otp))
+        email_thread = threading.Thread(target=self.send_otp_email, args=(user, otp, template))
         email_thread.start()
         return otp_record.id
 

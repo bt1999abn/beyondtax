@@ -1,10 +1,17 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+
 from accounts.api import views as accounts_api_views
 from knox.views import LogoutView, LogoutAllView
 from .views import UpcomingDueDatesApi, BusinessContactPersonAPIView, \
     SendEmailOtpApi, VerifyEmailOtpApi, SendEmailApi, ResetPasswordApi, UpcomingDueDatesByMonthApi, UpdateUserTypeView, \
-    ProfileDetailView, ProfileInformationUpdateView, ProfileAddressView, GovernmentIDView, ProfileBankDetailsListView, \
-    ProfileBankDetailsCreateView, ProfileBankDetailsUpdateView, ProfileBankDetailsDeleteView
+    ProfileDetailView, ProfileInformationUpdateView, ProfileAddressView, \
+    ProfileBankDetailsViewSet, GovernmentIDViewSet, SendEmailChangeOtpApi, VerifyEmailChangeOtpApi, \
+    SendMobileChangeOtpApi, VerifyMobileChangeOtpApi
+
+router = DefaultRouter()
+router.register(r'profile-bank-accounts', ProfileBankDetailsViewSet, basename='bank-accounts')
+router.register(r'government-ids', GovernmentIDViewSet, basename='government-id')
 
 urlpatterns =[
 
@@ -31,9 +38,11 @@ urlpatterns =[
     path('profile-details/', ProfileDetailView.as_view(), name='profile-detail'),
     path('profile-basic-details/', ProfileInformationUpdateView.as_view(), name='profile-basic-details'),
     path('profile-addresses/', ProfileAddressView.as_view(), name='profile-addresses'),
-    path('profile-government-ids/', GovernmentIDView.as_view(), name='government-ids-full'),
-    path('profile-bank-accounts/', ProfileBankDetailsListView.as_view(), name='bank-accounts-list'),
-    path('profile-bank-account-create/', ProfileBankDetailsCreateView.as_view(), name='bank-accounts-create'),
-    path('profile-bank-account-update/<str:pk>/', ProfileBankDetailsUpdateView.as_view(), name='bank-accounts-update'),
-    path('profile-bank-account-destroy/<str:pk>/', ProfileBankDetailsDeleteView.as_view(), name='bank-accounts-destroy'),
+    path('send-email-change-otp/', SendEmailChangeOtpApi.as_view(), name='send-email-change-otp'),
+    path('verify-email-change-otp/', VerifyEmailChangeOtpApi.as_view(), name='verify-email-change-otp'),
+    path('send-mobile-change-otp/', SendMobileChangeOtpApi.as_view(), name='send-mobile-change-otp'),
+    path('verify-mobile-change-otp/', VerifyMobileChangeOtpApi.as_view(), name='verify-mobile-change-otp'),
+
+
+    path('', include(router.urls)),
 ]

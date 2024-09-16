@@ -367,12 +367,16 @@ class ProfileInformationSerializer(BaseModelSerializer):
 class ProfileAddressSerializer(BaseModelSerializer):
     address_type_display = serializers.SerializerMethodField()
     rent_status_display = serializers.SerializerMethodField()
+
     class Meta:
         model = ProfileAddress
         fields = [
-            'id', 'address_type_display', 'rent_status_display', 'door_no', 'permise_name', 'street',
-            'area', 'city', 'state', 'pincode', 'country'
+            'id', 'address_type', 'address_type_display', 'rent_status_display', 'door_no', 'permise_name',
+            'street', 'area', 'city', 'state', 'pincode', 'country', 'rent_status', 'rental_agreement'
         ]
+        extra_kwargs = {
+            'rental_agreement': {'required': False, 'allow_null': True}
+        }
 
     def get_address_type_display(self, obj):
         return obj.get_address_type_display()
@@ -380,25 +384,38 @@ class ProfileAddressSerializer(BaseModelSerializer):
     def get_rent_status_display(self, obj):
         return obj.get_rent_status_display()
 
-    def validate_rent_status(self, value):
-        if value is None:
-            raise serializers.ValidationError("Rent status is required.")
-        return value
+    def validate(self, data):
+        rent_status = data.get('rent_status')
+        rental_agreement = data.get('rental_agreement')
+
+        if rent_status == ProfileAddress.RENTED and not rental_agreement:
+            raise serializers.ValidationError({
+                "rental_agreement": "Rental agreement must be uploaded if the address is rented."
+            })
+
+        return data
 
     def create(self, validated_data):
-        if 'rent_status' not in validated_data:
-            validated_data['rent_status'] = ProfileAddress.OWNED
         return super().create(validated_data)
 
 
 class ProfileInformationUpdateSerializer(BaseModelSerializer):
-    full_name = serializers.CharField(write_only=True)
+    full_name = serializers.SerializerMethodField()
     date_of_birth = serializers.CharField(write_only=True)
     date_of_birth_display = serializers.SerializerMethodField()
 
     class Meta:
         model = ProfileInformation
-        fields = ['full_name', 'fathers_name', 'date_of_birth', 'date_of_birth_display','gender', 'maritual_status']
+        fields = ['full_name', 'fathers_name', 'date_of_birth', 'date_of_birth_display', 'gender', 'maritual_status']
+        extra_kwargs = {
+            'date_of_birth': {'write_only': True}
+        }
+
+    def get_full_name(self, instance):
+        return f"{instance.first_name} {instance.last_name}".strip()
+
+    def get_date_of_birth_display(self, instance):
+        return instance.date_of_birth.strftime('%d/%m/%Y') if instance.date_of_birth else None
 
     def validate_date_of_birth(self, value):
         try:
@@ -406,16 +423,13 @@ class ProfileInformationUpdateSerializer(BaseModelSerializer):
         except ValueError:
             raise serializers.ValidationError("Date of birth must be in format 'dd/mm/yyyy'.")
 
-    def get_date_of_birth_display(self, instance):
-        return instance.date_of_birth.strftime('%d/%m/%Y') if instance.date_of_birth else None
-
     def update(self, instance, validated_data):
-
         full_name = validated_data.pop('full_name', None)
         if full_name:
             name_parts = full_name.split()
             instance.first_name = name_parts[0]
-            instance.last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+            instance.last_name = " ".join(name_parts[1:]) if len(
+                name_parts) > 1 else ""
 
         instance.fathers_name = validated_data.get('fathers_name', instance.fathers_name)
         instance.date_of_birth = validated_data.get('date_of_birth', instance.date_of_birth)
@@ -426,16 +440,67 @@ class ProfileInformationUpdateSerializer(BaseModelSerializer):
         return instance
 
 
-class GovernmentIDFullSerializer(BaseModelSerializer):
+class GovernmentIDSerializer(BaseModelSerializer):
     class Meta:
         model = GovernmentID
-        fields = '__all__'
+        fields = [
+            'id', 'pan_no', 'pan_card', 'is_pan_verified',
+            'aadhar_no', 'aadhar_card', 'is_aadhaar_verified',
+            'driving_license_no', 'driving_license_card', 'driving_license_validity', 'is_driving_license_verified',
+            'voter_id_no', 'voter_id_card', 'is_voter_id_verified',
+            'ration_card_no', 'ration_card_file', 'is_ration_card_verified',
+            'passport_no', 'passport_file', 'passport_validity', 'is_passport_verified'
+        ]
 
 
 class ProfileBankDetailsSerializer(BaseModelSerializer):
     class Meta:
         model = ProfileBankAccounts
         fields = ['id', 'account_no', 'ifsc_code', 'bank_name', 'type', 'is_primary']
+
+    def __init__(self, *args, **kwargs):
+        super(ProfileBankDetailsSerializer, self).__init__(*args, **kwargs)
+        self.fields['is_primary'].required = False
+
+    def validate(self, data):
+
+        is_primary = data.get('is_primary', False)
+        user = self.context['request'].user
+
+        if is_primary:
+            if self.instance and self.instance.is_primary == is_primary:
+                return data
+
+            existing_primary = ProfileBankAccounts.objects.filter(user=user, is_primary=True)
+
+            if self.instance:
+                existing_primary = existing_primary.exclude(id=self.instance.id)
+
+            if existing_primary.exists():
+                raise serializers.ValidationError("Only one primary bank account is allowed.")
+
+        return data
+
+
+class EmailUpdateOtpSerializer(BaseSerializer):
+    otp_id = serializers.CharField()
+    otp = serializers.CharField(max_length=4)
+
+    def validate_otp(self, value):
+        if len(value) != 4:
+            raise serializers.ValidationError("OTP must be 4 digits.")
+        if not value.isdigit():
+            raise serializers.ValidationError("OTP must contain only numbers.")
+        return value
+
+    def validate_otp_id(self, value):
+        try:
+            decoded_id = self.decode_id(value)
+            return decoded_id
+        except Exception as e:
+            raise serializers.ValidationError(f"Invalid OTP ID: {str(e)}")
+
+
 
 
 
