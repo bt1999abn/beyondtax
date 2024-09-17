@@ -355,13 +355,15 @@ class UpdateUserTypeSerializer(BaseModelSerializer):
 class UserSerializer(BaseModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'date_of_birth', 'gender', 'profile_picture','mobile_number', 'email']
+        fields = ['id', 'profile_picture','mobile_number', 'email']
 
 
 class ProfileInformationSerializer(BaseModelSerializer):
+    date_of_birth = serializers.DateField(format="%d/%m/%Y", input_formats=["%d/%m/%Y"])
+
     class Meta:
         model = ProfileInformation
-        fields = ['id', 'fathers_name', 'maritual_status']
+        fields = ['first_name', 'last_name', 'fathers_name', 'date_of_birth', 'gender', 'maritual_status']
 
 
 class ProfileAddressSerializer(BaseModelSerializer):
@@ -400,22 +402,14 @@ class ProfileAddressSerializer(BaseModelSerializer):
 
 
 class ProfileInformationUpdateSerializer(BaseModelSerializer):
-    full_name = serializers.SerializerMethodField()
-    date_of_birth = serializers.CharField(write_only=True)
-    date_of_birth_display = serializers.SerializerMethodField()
+    full_name = serializers.CharField(write_only=True)
+    date_of_birth = serializers.CharField()
+    profile_picture = serializers.ImageField(required=False)
 
     class Meta:
         model = ProfileInformation
-        fields = ['full_name', 'fathers_name', 'date_of_birth', 'date_of_birth_display', 'gender', 'maritual_status']
-        extra_kwargs = {
-            'date_of_birth': {'write_only': True}
-        }
-
-    def get_full_name(self, instance):
-        return f"{instance.first_name} {instance.last_name}".strip()
-
-    def get_date_of_birth_display(self, instance):
-        return instance.date_of_birth.strftime('%d/%m/%Y') if instance.date_of_birth else None
+        fields = ['full_name', 'fathers_name', 'date_of_birth', 'gender', 'maritual_status',
+                  'profile_picture']
 
     def validate_date_of_birth(self, value):
         try:
@@ -428,16 +422,27 @@ class ProfileInformationUpdateSerializer(BaseModelSerializer):
         if full_name:
             name_parts = full_name.split()
             instance.first_name = name_parts[0]
-            instance.last_name = " ".join(name_parts[1:]) if len(
-                name_parts) > 1 else ""
+            instance.last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
         instance.fathers_name = validated_data.get('fathers_name', instance.fathers_name)
         instance.date_of_birth = validated_data.get('date_of_birth', instance.date_of_birth)
         instance.gender = validated_data.get('gender', instance.gender)
         instance.maritual_status = validated_data.get('maritual_status', instance.maritual_status)
 
+        profile_picture = validated_data.get('profile_picture', None)
+        if profile_picture:
+            instance.user.profile_picture = profile_picture
+            instance.user.save()
+
         instance.save()
         return instance
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['full_name'] = f"{instance.first_name} {instance.last_name}".strip()
+        ret['date_of_birth'] = instance.date_of_birth.strftime('%d/%m/%Y') if instance.date_of_birth else None
+        ret['profile_picture'] = instance.user.profile_picture.url if instance.user.profile_picture else None
+        return ret
 
 
 class GovernmentIDSerializer(BaseModelSerializer):
@@ -499,7 +504,6 @@ class EmailUpdateOtpSerializer(BaseSerializer):
             return decoded_id
         except Exception as e:
             raise serializers.ValidationError(f"Invalid OTP ID: {str(e)}")
-
 
 
 

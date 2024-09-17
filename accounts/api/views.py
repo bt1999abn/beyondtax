@@ -388,8 +388,14 @@ class ProfileDetailView(generics.RetrieveAPIView):
         profile_address_serializer = ProfileAddressSerializer(profile_address, many=True)
 
         response_data = {
-            'user': user_serializer.data,
-            'profile_information': profile_info_serializer.data if profile_info_serializer else None,
+            'profile_picture': user_serializer.data['profile_picture'],
+            'mobile_number': user_serializer.data['mobile_number'],
+            'email': user_serializer.data['email'],
+            'full_name': f"{profile_info_serializer.data['first_name']} {profile_info_serializer.data['last_name']}" if profile_info_serializer else None,
+            'fathers_name': profile_info_serializer.data['fathers_name'] if profile_info_serializer else None,
+            'date_of_birth': profile_info_serializer.data['date_of_birth'] if profile_info_serializer else None,
+            'gender': profile_info_serializer.data['gender'] if profile_info_serializer else None,
+            'maritual_status': profile_info_serializer.data['maritual_status'] if profile_info_serializer else None,
             'profile_address': profile_address_serializer.data
         }
 
@@ -399,6 +405,7 @@ class ProfileDetailView(generics.RetrieveAPIView):
 class ProfileInformationUpdateView(generics.UpdateAPIView):
     queryset = ProfileInformation.objects.all()
     serializer_class = ProfileInformationUpdateSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return ProfileInformation.objects.get(user=self.request.user)
@@ -432,6 +439,7 @@ class ProfileAddressView(generics.GenericAPIView):
                 'door_no': request.data.get(f"addresses[{i}].door_no"),
                 'permise_name': request.data.get(f"addresses[{i}].permise_name"),
                 'street': request.data.get(f"addresses[{i}].street"),
+                'area': request.data.get(f"addresses[{i}].area"),
                 'city': request.data.get(f"addresses[{i}].city"),
                 'state': request.data.get(f"addresses[{i}].state"),
                 'pincode': request.data.get(f"addresses[{i}].pincode"),
@@ -484,6 +492,7 @@ class ProfileAddressView(generics.GenericAPIView):
                     'door_no': request.data.get(f"addresses[{i}].door_no"),
                     'permise_name': request.data.get(f"addresses[{i}].permise_name"),
                     'street': request.data.get(f"addresses[{i}].street"),
+                    'area': request.data.get(f"addresses[{i}].area"),
                     'city': request.data.get(f"addresses[{i}].city"),
                     'state': request.data.get(f"addresses[{i}].state"),
                     'pincode': request.data.get(f"addresses[{i}].pincode"),
@@ -605,15 +614,16 @@ class SendEmailChangeOtpApi(APIView):
         if User.objects.filter(email=new_email).exists():
             return Response({'status': 'error', 'message': 'This email is already in use by another user'},
                             status=status.HTTP_400_BAD_REQUEST)
-
         user = request.user
-
         otp_service = SendEmailOtpService()
         otp_id = otp_service.send_otp_to_new_email(new_email)
-        request.session['email_otp_id'] = otp_id
+
+        encoded_otp_id = AlphaId.encode(otp_id)
+
+        request.session['email_otp_id'] = encoded_otp_id
         request.session['new_email'] = new_email
 
-        return Response({'status': 'success', 'message': 'OTP sent to the new email', 'otp_id': otp_id},
+        return Response({'status': 'success', 'message': 'OTP sent to the new email', 'otp_id': encoded_otp_id},
                         status=status.HTTP_200_OK)
 
 
