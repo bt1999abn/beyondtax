@@ -123,13 +123,12 @@ class SendEmailOtpService:
     def generate_otp(self):
         return random.randint(1000, 9999)
 
-    def send_otp_email(self, user, otp, template='otp_email'):
+    def send_otp_email(self, email, otp, template='otp_email'):
         subject = 'Your OTP for Verification'
-        first_name = user.first_name
-        html_message = render_to_string(f'email_templates/{template}.html', {'user': first_name, 'otp': otp})
+        html_message = render_to_string(f'email_templates/{template}.html', {'otp': otp})
         plain_message = strip_tags(html_message)
         email_from = settings.EMAIL_HOST_USER
-        recipient_list = [user.email]
+        recipient_list = [email]
         send_mail(subject, plain_message, email_from, recipient_list, html_message=html_message)
 
     def send_otp_to_new_email(self, new_email, template='email_id_update'):
@@ -139,7 +138,7 @@ class SendEmailOtpService:
             otp=str(otp),
             source=OtpRecord.Email
         )
-        email_thread = threading.Thread(target=self.send_otp_email, args=(new_email, otp, template, None))
+        email_thread = threading.Thread(target=self.send_otp_email, args=(new_email, otp, template))
         email_thread.start()
 
         return otp_record.id
@@ -152,8 +151,9 @@ class SendEmailOtpService:
             otp=str(otp),
             source=OtpRecord.Email,
         )
-        email_thread = threading.Thread(target=self.send_otp_email, args=(user, otp, template))
+        email_thread = threading.Thread(target=self.send_otp_email, args=(user.email, otp, template))
         email_thread.start()
+
         return otp_record.id
 
     def verify_otp(self, otp_id, otp):

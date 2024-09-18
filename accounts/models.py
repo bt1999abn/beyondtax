@@ -297,7 +297,7 @@ class GovernmentID(abstract_models.BaseModel):
             message="Ration Card number must be between 10 and 12 characters"
         )
     ])
-    ration_card_file = models.FileField(upload_to='government_id_proofs/ration_card/', blank=True, null=True)
+    ration_card = models.FileField(upload_to='government_id_proofs/ration_card/', blank=True, null=True)
     is_ration_card_verified = models.BooleanField(default=False)
 
     passport_no = models.CharField(max_length=8, blank=True, null=True, validators=[
@@ -306,9 +306,25 @@ class GovernmentID(abstract_models.BaseModel):
             message="Passport number must be in format 'A1234567'"
         )
     ])
-    passport_file = models.FileField(upload_to='government_id_proofs/passport/', blank=True, null=True)
+    passport = models.FileField(upload_to='government_id_proofs/passport/', blank=True, null=True)
     passport_validity = models.DateField(blank=True, null=True)
     is_passport_verified = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if self.pan_no:
+            self.pan_no = self.pan_no.upper()
+        if self.aadhar_no:
+            self.aadhar_no = self.aadhar_no.upper()
+        if self.driving_license_no:
+            self.driving_license_no = self.driving_license_no.upper()
+        if self.voter_id_no:
+            self.voter_id_no = self.voter_id_no.upper()
+        if self.ration_card_no:
+            self.ration_card_no = self.ration_card_no.upper()
+        if self.passport_no:
+            self.passport_no = self.passport_no.upper()
+
+        super(GovernmentID, self).save(*args, **kwargs)
 
 
 class OtpRecord(abstract_models.BaseModel):
