@@ -3,6 +3,7 @@ from collections import defaultdict, OrderedDict
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.files.images import get_image_dimensions
+from django.db import models
 from django.shortcuts import redirect
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
@@ -20,7 +21,7 @@ from accounts.api.serializers import RegistrationSerializer, UserProfileSerializ
     BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter, \
     PasswordResetSerializer, UpdateUserTypeSerializer, ProfileInformationSerializer, UserSerializer, \
     ProfileAddressSerializer, ProfileInformationUpdateSerializer, \
-    ProfileBankDetailsSerializer, GovernmentIDSerializer, EmailUpdateOtpSerializer
+    ProfileBankDetailsSerializer, GovernmentIDSerializer, EmailUpdateOtpSerializer, UserProfilePictureSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails, ProfileInformation, \
     ProfileAddress, GovernmentID, ProfileBankAccounts
@@ -408,7 +409,10 @@ class ProfileInformationUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        return ProfileInformation.objects.get(user=self.request.user)
+        try:
+            return ProfileInformation.objects.get(user=self.request.user)
+        except ProfileInformation.DoesNotExist:
+            return ProfileInformation.objects.create(user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -474,19 +478,23 @@ class ProfileAddressView(generics.GenericAPIView):
         user = request.user
         updated_addresses = []
         errors = []
+
         address_keys = [key for key in request.data.keys() if key.startswith('addresses[')]
-        num_addresses = max(
-            [int(key.split('[')[1].split(']')[0]) for key in address_keys]) + 1
+        if not address_keys:
+            return Response({"error": "No addresses provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        num_addresses = max([int(key.split('[')[1].split(']')[0]) for key in address_keys]) + 1
 
         for i in range(num_addresses):
             encoded_address_id = request.data.get(f"addresses[{i}].id")
-
             if not encoded_address_id:
                 errors.append({"error": f"Address ID is required for updating address index {i}."})
                 continue
+
             try:
                 address_id = AlphaId.decode(encoded_address_id)
                 address_instance = ProfileAddress.objects.get(id=address_id, user=user)
+
                 address_data = {
                     'address_type': request.data.get(f"addresses[{i}].address_type"),
                     'door_no': request.data.get(f"addresses[{i}].door_no"),
@@ -500,12 +508,12 @@ class ProfileAddressView(generics.GenericAPIView):
                     'rent_status': request.data.get(f"addresses[{i}].rent_status"),
                     'rental_agreement': request.FILES.get(f"addresses[{i}].rental_agreement")
                 }
+                address_data = {key: value for key, value in address_data.items() if value is not None}
                 serializer = self.serializer_class(address_instance, data=address_data, partial=True)
-
                 if serializer.is_valid():
                     updated_instance = serializer.save()
                     updated_instance_data = serializer.data
-                    updated_instance_data['id'] = AlphaId.encode(updated_instance.id)
+                    updated_instance_data['id'] = AlphaId.encode(updated_instance.id)  # Re-encode the ID
                     updated_addresses.append(updated_instance_data)
                 else:
                     errors.append({encoded_address_id: serializer.errors})
@@ -516,7 +524,6 @@ class ProfileAddressView(generics.GenericAPIView):
                 "updated_addresses": updated_addresses,
                 "errors": errors
             }, status=status.HTTP_207_MULTI_STATUS)
-
         return Response({
             "updated_addresses": updated_addresses
         }, status=status.HTTP_200_OK)
@@ -551,12 +558,15 @@ class ProfileBankDetailsViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['put'], url_path='batch-update')
     def batch_update(self, request, *args, **kwargs):
-
         user = self.request.user
         data_list = request.data
 
         if not isinstance(data_list, list):
             raise ValidationError("Input data must be a list of bank accounts.")
+        primary_count = sum([1 for data in data_list if data.get('is_primary', False)])
+
+        if primary_count > 1:
+            raise ValidationError("You can only set one account as primary.")
 
         updated_instances = []
         for data in data_list:
@@ -571,12 +581,12 @@ class ProfileBankDetailsViewSet(viewsets.ModelViewSet):
 
             serializer = self.get_serializer(instance, data=data, partial=True)
             serializer.is_valid(raise_exception=True)
-
-            if data.get('is_primary', False):
-                ProfileBankAccounts.objects.filter(user=user, is_primary=True).update(is_primary=False)
-
             updated_instance = serializer.save()
             updated_instances.append(updated_instance)
+
+        if any(data.get('is_primary', False) for data in data_list):
+            ProfileBankAccounts.objects.filter(user=user).exclude(
+                id__in=[instance.id for instance in updated_instances]).update(is_primary=False)
 
         response_serializer = self.get_serializer(updated_instances, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
@@ -586,6 +596,7 @@ class GovernmentIDViewSet(viewsets.ModelViewSet):
     queryset = GovernmentID.objects.all()
     serializer_class = GovernmentIDSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
     def get_queryset(self):
         return GovernmentID.objects.filter(user=self.request.user)
@@ -601,6 +612,45 @@ class GovernmentIDViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(user=self.request.user)
 
+    @action(detail=True, methods=['patch'], url_path='clear-field')
+    def clear_field(self, request, pk=None):
+        try:
+            decoded_id = AlphaId.decode(pk)
+        except Exception as e:
+            return Response({"detail": "Invalid ID provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            government_id = GovernmentID.objects.get(pk=decoded_id)
+        except GovernmentID.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if government_id.user != request.user and not request.user.is_superuser:
+            return Response({"detail": "You are not authorized to modify this object."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        file_fields = ['pan_card', 'aadhar_card', 'driving_license_card', 'voter_id_card', 'ration_card']
+        non_file_fields = ['pan_no', 'aadhar_no', 'passport_no','driving_license_no','voter_id_no']
+
+        cleared_values = {}
+        for field in file_fields:
+            if field in request.FILES:
+                setattr(government_id, field, request.FILES[field])
+                cleared_values[field] = request.FILES[field].name
+            elif field in request.data:
+                setattr(government_id, field, None)
+                cleared_values[field] = None
+
+        for field in non_file_fields:
+            if field in request.data:
+                setattr(government_id, field, request.data[field])
+                cleared_values[field] = request.data[field]
+        government_id.save()
+
+        return Response({
+            "detail": "Fields have been updated or cleared.",
+            "cleared_values": cleared_values
+        }, status=status.HTTP_200_OK)
+
 
 class SendEmailChangeOtpApi(APIView):
     permission_classes = [IsAuthenticated]
@@ -612,58 +662,45 @@ class SendEmailChangeOtpApi(APIView):
             return Response({'status': 'error', 'message': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(email=new_email).exists():
-            return Response({'status': 'error', 'message': 'This email is already in use by another user'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        user = request.user
+            return Response({'status': 'error', 'message': 'This email is already in use by another user'}, status=status.HTTP_400_BAD_REQUEST)
         otp_service = SendEmailOtpService()
         otp_id = otp_service.send_otp_to_new_email(new_email)
-
         encoded_otp_id = AlphaId.encode(otp_id)
-
         request.session['email_otp_id'] = encoded_otp_id
         request.session['new_email'] = new_email
-
-        return Response({'status': 'success', 'message': 'OTP sent to the new email', 'otp_id': encoded_otp_id},
-                        status=status.HTTP_200_OK)
+        return Response({'status': 'success', 'message': 'OTP sent to the new email', 'otp_id': encoded_otp_id}, status=status.HTTP_200_OK)
 
 
 class VerifyEmailChangeOtpApi(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        serializer = EmailUpdateOtpSerializer(data=request.data)
-        if serializer.is_valid():
-            otp_id = serializer.validated_data['otp_id']
-            otp = serializer.validated_data['otp']
+        otp_id = request.data.get('otp_id')
+        otp = request.data.get('otp')
 
-            try:
-                otp_record = OtpRecord.objects.get(id=otp_id, otp=otp)
+        if not otp_id or not otp:
+            return Response({'status': 'error', 'message': 'OTP ID and OTP are required'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            decoded_otp_id = AlphaId.decode(otp_id)
+        except Exception:
+            return Response({'status': 'error', 'message': 'Invalid OTP ID format'}, status=status.HTTP_400_BAD_REQUEST)
+        otp_service = SendEmailOtpService()
+        otp_valid = otp_service.verify_otp(decoded_otp_id, otp)
 
-                if otp_record.is_expired():
-                    return Response({'status': 'error', 'message': 'OTP has expired'},
-                                    status=status.HTTP_400_BAD_REQUEST)
-
-                user = request.user
-
-                new_email = request.session.get('new_email')
-
-                if not new_email:
-                    return Response({'status': 'error', 'message': 'No new email found'},
-                                    status=status.HTTP_400_BAD_REQUEST)
-                user.email = new_email
-                user.save()
-                del request.session['email_otp_id']
-                del request.session['new_email']
-                otp_record.delete()
-
-                return Response({'status': 'success', 'message': 'Email updated successfully'},
-                                status=status.HTTP_200_OK)
-
-            except OtpRecord.DoesNotExist:
-                return Response({'status': 'error', 'message': 'Invalid OTP or OTP ID'},
+        if otp_valid:
+            new_email = request.session.get('new_email')
+            if not new_email:
+                return Response({'status': 'error', 'message': 'No new email found in session'},
                                 status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            user = request.user
+            user.email = new_email
+            user.save()
+            del request.session['email_otp_id']
+            del request.session['new_email']
+            return Response({'status': 'success', 'message': 'Email updated successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'message': 'Invalid OTP or OTP has expired'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class SendMobileChangeOtpApi(APIView):
@@ -716,3 +753,38 @@ class VerifyMobileChangeOtpApi(APIView):
 
         except OtpRecord.DoesNotExist:
             return Response({'status': 'error', 'message': 'Invalid OTP ID or OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateProfilePictureApi(generics.UpdateAPIView):
+    serializer_class = UserProfilePictureSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', True)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({"status": "success", "message": "Profile picture updated successfully"})
+
+
+class DeleteProfilePictureApi(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def delete(self, request, *args, **kwargs):
+        user = self.get_object()
+
+        if user.profile_picture:
+            user.profile_picture.delete(save=False)
+            user.profile_picture = None
+            user.save()
+
+            return Response({"status": "success", "message": "Profile picture deleted successfully"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"status": "error", "message": "No profile picture to delete"}, status=status.HTTP_400_BAD_REQUEST)

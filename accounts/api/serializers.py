@@ -404,12 +404,10 @@ class ProfileAddressSerializer(BaseModelSerializer):
 class ProfileInformationUpdateSerializer(BaseModelSerializer):
     full_name = serializers.CharField(write_only=True)
     date_of_birth = serializers.CharField()
-    profile_picture = serializers.ImageField(required=False)
 
     class Meta:
         model = ProfileInformation
-        fields = ['full_name', 'fathers_name', 'date_of_birth', 'gender', 'maritual_status',
-                  'profile_picture']
+        fields = ['full_name', 'fathers_name', 'date_of_birth', 'gender', 'maritual_status']
 
     def validate_date_of_birth(self, value):
         try:
@@ -429,11 +427,6 @@ class ProfileInformationUpdateSerializer(BaseModelSerializer):
         instance.gender = validated_data.get('gender', instance.gender)
         instance.maritual_status = validated_data.get('maritual_status', instance.maritual_status)
 
-        profile_picture = validated_data.get('profile_picture', None)
-        if profile_picture:
-            instance.user.profile_picture = profile_picture
-            instance.user.save()
-
         instance.save()
         return instance
 
@@ -441,7 +434,6 @@ class ProfileInformationUpdateSerializer(BaseModelSerializer):
         ret = super().to_representation(instance)
         ret['full_name'] = f"{instance.first_name} {instance.last_name}".strip()
         ret['date_of_birth'] = instance.date_of_birth.strftime('%d/%m/%Y') if instance.date_of_birth else None
-        ret['profile_picture'] = instance.user.profile_picture.url if instance.user.profile_picture else None
         return ret
 
 
@@ -504,6 +496,17 @@ class EmailUpdateOtpSerializer(BaseSerializer):
             return decoded_id
         except Exception as e:
             raise serializers.ValidationError(f"Invalid OTP ID: {str(e)}")
+
+
+class UserProfilePictureSerializer(BaseModelSerializer):
+    class Meta:
+        model = User
+        fields = ['profile_picture']
+
+    def validate_profile_picture(self, value):
+        if not value:
+            raise serializers.ValidationError("Profile picture is required for update.")
+        return value
 
 
 
