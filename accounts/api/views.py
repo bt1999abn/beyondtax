@@ -1,5 +1,4 @@
-from collections import defaultdict, OrderedDict
-
+from collections import defaultdict
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.files.images import get_image_dimensions
