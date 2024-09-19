@@ -445,4 +445,85 @@ class BusinessContactPersonDetails(abstract_models.BaseModel):
     mobile_number = models.CharField(validators=[mobile_regex], max_length=10)
 
 
+class FinancialOwnershipDetails(abstract_models.BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="financial_ownership_details")
+    is_partner_in_firm = models.BooleanField(default=False)
+    has_unlisted_shares = models.BooleanField(default=False)
+    is_director_in_company = models.BooleanField(default=False)
+    has_esops = models.BooleanField(default=False)
 
+
+class UnlistedShareHolding(abstract_models.BaseModel):
+    COMPANY_TYPE_CHOICES = [
+        ('Private Limited', 'Private Limited'),
+        ('Public Limited', 'Public Limited'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="unlisted_share_holdings")
+
+    company_name = models.CharField(max_length=255)
+    pan_of_company = models.CharField(max_length=10)
+    company_type = models.CharField(choices=COMPANY_TYPE_CHOICES, null=True, blank=True)
+    isin_code = models.CharField(max_length=12, blank=True, null=True)
+    face_price_per_share = models.DecimalField(max_digits=10, decimal_places=2)
+    purchase_price_per_share = models.DecimalField(max_digits=20, decimal_places=2)
+    balance_cost = models.DecimalField(max_digits=20, decimal_places=2)
+    quantity = models.IntegerField()
+
+
+class DirectorshipDetails(abstract_models.BaseModel):
+    COMPANY_TYPE_CHOICES = [
+        ('Private Limited', 'Private Limited'),
+        ('Public Limited', 'Public Limited'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="directorships")
+
+    company_name = models.CharField(max_length=255)
+    pan_of_company = models.CharField(max_length=10)
+    company_type = models.CharField(choices=COMPANY_TYPE_CHOICES, null=True, blank=True)
+    isin_code = models.CharField(max_length=12, blank=True, null=True)
+
+
+class EsopDetails(abstract_models.BaseModel):
+    COMPANY_TYPE_CHOICES = [
+        ('Private Limited', 'Private Limited'),
+        ('Public Limited', 'Public Limited'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="esops")
+
+    startup_name = models.CharField(max_length=255)
+    pan_of_company = models.CharField(max_length=10)
+    company_type = models.CharField(choices=COMPANY_TYPE_CHOICES, null=True, blank=True)
+    dpit_reg_no = models.CharField(max_length=50, blank=True, null=True)
+    tax_deferred = models.DecimalField(max_digits=10, decimal_places=2)
+    balance_tax_payable = models.DecimalField(max_digits=10, decimal_places=2)
+
+
+class ReturnFilingInformation(abstract_models.BaseModel):
+    SECTION_CHOICES = [
+        ('Section 139(1)', 'Section 139(1) - On or before the due date'),
+        ('Section 139(4)', 'Section 139(4) - Belated return'),
+        ('Section 139(5)', 'Section 139(5) - Revised return'),
+        ('Section 139(3)', 'Section 139(3) - Loss return'),
+        ('Section 92CD', 'Section 92CD - Modified return under APA'),
+        ('Section 119(2)(b)', 'Section 119(2)(b) - Return after condonation of delay'),
+    ]
+
+    RETURN_TYPE_CHOICES = [
+        ('Original', 'Original'),
+        ('Revised', 'Revised'),
+        ('Modified', 'Modified'),
+        ('Belated', 'Belated'),
+    ]
+
+    REPRESENTATIVE_ASSESSEE_CHOICES = [
+        ('Legal Representative', 'Legal Representative'),
+        ('Agent', 'Agent'),
+        ('Guardian', 'Guardian'),
+        ('Trustee', 'Trustee'),
+        ('Any other person representing the assessee', 'Any other person representing the assessee'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="return_filing_info")
+
+    section_filed_under = models.CharField(choices=SECTION_CHOICES, null=True, blank=True)
+    return_type = models.CharField(choices=RETURN_TYPE_CHOICES, null=True, blank=True)
+    has_representative_access = models.CharField(choices=REPRESENTATIVE_ASSESSEE_CHOICES, null=True, blank=True)
