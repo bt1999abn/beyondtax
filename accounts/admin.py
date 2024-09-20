@@ -3,7 +3,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts import models as accounts_models
 from accounts.models import UpcomingDueDates, OtpRecord, ProfileInformation, ProfileAddress, ProfileBankAccounts, \
-    GovernmentID
+    GovernmentID, FinancialOwnershipDetails, UnlistedShareHolding, DirectorshipDetails, EsopDetails, \
+    ReturnFilingInformation
 from accounts.proxy_models import ProductProxy
 from payments.models import Payment
 
@@ -133,6 +134,35 @@ class OtpRecordAdmin(admin.ModelAdmin):
     search_fields = ('source',)
 
 
+class FinancialOwnershipDetailsAdmin(admin.ModelAdmin):
+    list_display = ('user', 'is_partner_in_firm', 'has_unlisted_shares', 'is_director_in_company', 'has_esops')
+    search_fields = ('user__username',)
+    list_filter = ('is_partner_in_firm', 'has_unlisted_shares', 'is_director_in_company', 'has_esops')
+
+
+class UnlistedShareHoldingAdmin(admin.ModelAdmin):
+    list_display = ('user', 'company_name', 'pan_of_company', 'company_type')
+    search_fields = ('company_name', 'pan_of_company')
+    list_filter = ('company_type',)
+
+
+class DirectorshipDetailsAdmin(admin.ModelAdmin):
+    list_display = ('user', 'company_name', 'pan_of_company', 'company_type')
+    search_fields = ('company_name', 'pan_of_company')
+    list_filter = ('company_type',)
+
+
+class EsopDetailsAdmin(admin.ModelAdmin):
+    list_display = ('user', 'startup_name', 'pan_of_company', 'dpit_reg_no')
+    search_fields = ('startup_name', 'pan_of_company', 'dpit_reg_no')
+
+
+class ReturnFilingInformationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'section_filed_under', 'return_type', 'has_representative_access')
+    search_fields = ('section_filed_under', 'return_type')
+    list_filter = ('section_filed_under', 'return_type')
+
+
 # Now register the new UserAdmin...
 admin.site.register(accounts_models.User, UserAdmin)
 admin.site.register(ProductProxy, ProductProxyAdmin)
@@ -142,6 +172,11 @@ admin.site.register(ProfileInformation, ProfileInformationAdmin)
 admin.site.register(ProfileAddress, ProfileAddressAdmin)
 admin.site.register(ProfileBankAccounts, ProfileBankAccountsAdmin)
 admin.site.register(GovernmentID, GovernmentIDAdmin)
+admin.site.register(FinancialOwnershipDetails, FinancialOwnershipDetailsAdmin)
+admin.site.register(UnlistedShareHolding, UnlistedShareHoldingAdmin)
+admin.site.register(DirectorshipDetails, DirectorshipDetailsAdmin)
+admin.site.register(EsopDetails, EsopDetailsAdmin)
+admin.site.register(ReturnFilingInformation, ReturnFilingInformationAdmin)
 # # ... and, since we're not using Django's built-in permissions,
 # # unregister the Group model from admin_panel.
 # admin_panel.site.unregister(Group)

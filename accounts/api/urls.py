@@ -7,7 +7,8 @@ from .views import UpcomingDueDatesApi, BusinessContactPersonAPIView, \
     SendEmailOtpApi, VerifyEmailOtpApi, SendEmailApi, ResetPasswordApi, UpcomingDueDatesByMonthApi, UpdateUserTypeView, \
     ProfileDetailView, ProfileInformationUpdateView, ProfileAddressView, \
     ProfileBankDetailsViewSet, GovernmentIDViewSet, SendEmailChangeOtpApi, VerifyEmailChangeOtpApi, \
-    SendMobileChangeOtpApi, VerifyMobileChangeOtpApi, UpdateProfilePictureApi, DeleteProfilePictureApi
+    SendMobileChangeOtpApi, VerifyMobileChangeOtpApi, UpdateProfilePictureApi, DeleteProfilePictureApi, \
+    TaxInformationView
 
 router = DefaultRouter()
 router.register(r'profile-bank-accounts', ProfileBankDetailsViewSet, basename='bank-accounts')
@@ -44,6 +45,7 @@ urlpatterns =[
     path('verify-mobile-change-otp/', VerifyMobileChangeOtpApi.as_view(), name='verify-mobile-change-otp'),
     path('profile-picture-update/', UpdateProfilePictureApi.as_view(), name='profile-picture-update'),
     path('profile-picture-delete/', DeleteProfilePictureApi.as_view(), name='profile-picture-delete'),
+    path('profile-tax-information/', TaxInformationView.as_view(), name='profile-tax-information'),
 
 
     path('', include(router.urls)),

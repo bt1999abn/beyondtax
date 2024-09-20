@@ -20,10 +20,11 @@ from accounts.api.serializers import RegistrationSerializer, UserProfileSerializ
     BusinessContactPersonSerializer, UserBusinessContactPersonsSerializer, UpcomingDueDatesFilter, \
     PasswordResetSerializer, UpdateUserTypeSerializer, ProfileInformationSerializer, UserSerializer, \
     ProfileAddressSerializer, ProfileInformationUpdateSerializer, \
-    ProfileBankDetailsSerializer, GovernmentIDSerializer, EmailUpdateOtpSerializer, UserProfilePictureSerializer
+    ProfileBankDetailsSerializer, GovernmentIDSerializer, EmailUpdateOtpSerializer, UserProfilePictureSerializer, \
+    FinancialOwnershipDetailsSerializer, ReturnFilingInformationSerializer
 from accounts.api.serializers import LoginSerializer
 from accounts.models import OtpRecord, UpcomingDueDates, User, BusinessContactPersonDetails, ProfileInformation, \
-    ProfileAddress, GovernmentID, ProfileBankAccounts
+    ProfileAddress, GovernmentID, ProfileBankAccounts, FinancialOwnershipDetails, ReturnFilingInformation
 from accounts.services import SendMobileOtpService, get_user_data, SendEmailOtpService, EmailService
 from beyondTax import settings
 from shared.libs.hashing import AlphaId
@@ -562,11 +563,6 @@ class ProfileBankDetailsViewSet(viewsets.ModelViewSet):
 
         if not isinstance(data_list, list):
             raise ValidationError("Input data must be a list of bank accounts.")
-        primary_count = sum([1 for data in data_list if data.get('is_primary', False)])
-
-        if primary_count > 1:
-            raise ValidationError("You can only set one account as primary.")
-
         updated_instances = []
         for data in data_list:
             encoded_id = data.get('id')
@@ -582,13 +578,16 @@ class ProfileBankDetailsViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             updated_instance = serializer.save()
             updated_instances.append(updated_instance)
+            primary_account_ids = [data.get('id') for data in data_list if data.get('is_primary', False)]
 
-        if any(data.get('is_primary', False) for data in data_list):
+
+        if primary_account_ids:
             ProfileBankAccounts.objects.filter(user=user).exclude(
-                id__in=[instance.id for instance in updated_instances]).update(is_primary=False)
+                id__in=[AlphaId.decode(pid) for pid in primary_account_ids]).update(is_primary=False)
 
         response_serializer = self.get_serializer(updated_instances, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
 
 
 class GovernmentIDViewSet(viewsets.ModelViewSet):
@@ -787,3 +786,28 @@ class DeleteProfilePictureApi(generics.DestroyAPIView):
             return Response({"status": "success", "message": "Profile picture deleted successfully"}, status=status.HTTP_200_OK)
         else:
             return Response({"status": "error", "message": "No profile picture to delete"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TaxInformationView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        financial_ownership_details = FinancialOwnershipDetails.objects.filter(user=user).first()
+        if not financial_ownership_details:
+            return Response({'error': 'No financial ownership details found for this user.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        financial_ownership_serializer = FinancialOwnershipDetailsSerializer(financial_ownership_details)
+
+        return_filing_info = ReturnFilingInformation.objects.filter(user=user).first()
+        return_filing_serializer = ReturnFilingInformationSerializer(return_filing_info)
+
+        response_data = {
+            'financial_ownership_details': financial_ownership_serializer.data,
+            'return_filing_information': return_filing_serializer.data if return_filing_info else {},
+            'residential_status': user.residential_status if hasattr(user, 'residential_status') else None
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)

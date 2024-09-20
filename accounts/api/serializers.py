@@ -8,7 +8,8 @@ from django_filters import rest_framework as filters
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from accounts.models import User, UpcomingDueDates, BusinessContactPersonDetails, OtpRecord, ProfileInformation, \
-    ProfileAddress, GovernmentID, ProfileBankAccounts
+    ProfileAddress, GovernmentID, ProfileBankAccounts, UnlistedShareHolding, DirectorshipDetails, EsopDetails, \
+    ReturnFilingInformation, FinancialOwnershipDetails
 from services.incomeTax.models import IncomeTaxProfile, IncomeTaxReturnYears, IncomeTaxReturn
 from shared.libs.hashing import AlphaId
 from shared.rest.serializers import BaseSerializer, BaseModelSerializer
@@ -386,17 +387,6 @@ class ProfileAddressSerializer(BaseModelSerializer):
     def get_rent_status_display(self, obj):
         return obj.get_rent_status_display()
 
-    def validate(self, data):
-        rent_status = data.get('rent_status')
-        rental_agreement = data.get('rental_agreement')
-
-        if rent_status == ProfileAddress.RENTED and not rental_agreement:
-            raise serializers.ValidationError({
-                "rental_agreement": "Rental agreement must be uploaded if the address is rented."
-            })
-
-        return data
-
     def create(self, validated_data):
         return super().create(validated_data)
 
@@ -451,6 +441,7 @@ class GovernmentIDSerializer(BaseModelSerializer):
 
 
 class ProfileBankDetailsSerializer(BaseModelSerializer):
+
     class Meta:
         model = ProfileBankAccounts
         fields = ['id', 'account_no', 'ifsc_code', 'bank_name', 'type', 'is_primary']
@@ -458,25 +449,6 @@ class ProfileBankDetailsSerializer(BaseModelSerializer):
     def __init__(self, *args, **kwargs):
         super(ProfileBankDetailsSerializer, self).__init__(*args, **kwargs)
         self.fields['is_primary'].required = False
-
-    def validate(self, data):
-
-        is_primary = data.get('is_primary', False)
-        user = self.context['request'].user
-
-        if is_primary:
-            if self.instance and self.instance.is_primary == is_primary:
-                return data
-
-            existing_primary = ProfileBankAccounts.objects.filter(user=user, is_primary=True)
-
-            if self.instance:
-                existing_primary = existing_primary.exclude(id=self.instance.id)
-
-            if existing_primary.exists():
-                raise serializers.ValidationError("Only one primary bank account is allowed.")
-
-        return data
 
 
 class EmailUpdateOtpSerializer(BaseSerializer):
@@ -509,6 +481,39 @@ class UserProfilePictureSerializer(BaseModelSerializer):
         return value
 
 
+class UnlistedShareHoldingSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = UnlistedShareHolding
+        fields = ['id', 'company_name', 'pan_of_company', 'company_type', 'isin_code', 'face_price_per_share', 'purchase_price_per_share', 'balance_cost', 'quantity']
 
 
+class DirectorshipDetailsSerializer(BaseModelSerializer):
 
+    class Meta:
+        model = DirectorshipDetails
+        fields = ['id', 'company_name', 'pan_of_company', 'company_type', 'isin_code']
+
+
+class EsopDetailsSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = EsopDetails
+        fields = ['id', 'startup_name', 'pan_of_company', 'company_type', 'dpit_reg_no', 'tax_deferred', 'balance_tax_payable']
+
+
+class ReturnFilingInformationSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ReturnFilingInformation
+        fields = ['id', 'section_filed_under', 'return_type', 'has_representative_access']
+
+
+class FinancialOwnershipDetailsSerializer(BaseModelSerializer):
+    unlisted_share_details = UnlistedShareHoldingSerializer(many=True, source='user.unlisted_share_holdings', read_only=True)
+    directorship_details = DirectorshipDetailsSerializer(many=True, source='user.directorships', read_only=True)
+    esop_details = EsopDetailsSerializer(many=True, source='user.esops', read_only=True)
+
+    class Meta:
+        model = FinancialOwnershipDetails
+        fields = ['id', 'is_partner_in_firm', 'has_unlisted_shares', 'is_director_in_company', 'has_esops', 'unlisted_share_details', 'directorship_details', 'esop_details']
